@@ -1,6 +1,76 @@
 #!/bin/bash
-Dir=`dirname $0`
-Working=`pwd -P $Dir`
+
+MyDir=`dirname $0` ; cd $MyDir
+
+# Working=`pwd -P $MyDir`
+
+KsCreator="Create-New-Host.sh"
+DefaultsFile="ks-variables.cfg"
+
+Prefix=`grep -i ^prefix $KsCreator | cut -f2 -d\"` 
+if [ `find $MyDir -type f | grep -i $Prefix | wc -l` -lt 1 ]
+then
+	echo nothing to work with
+	exit 5
+else
+	printf "\nFound some kickstart configs...\n\n"
+	find $MyDir -type f | grep -i $Prefix | sed -e 's/^/\t/g'
+	printf "\n... continue ... [Ctrl-C to stop] ?\n\n"
+	read
+
+fi
+
+Rhl_Iso=`grep "RHEL_ISO_File"  $DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` \
+       	&& echo "Found RHEL iso config : "$Rhl_Iso \
+	&& [ `ls $Rhl_Iso 2>/dev/null | wc -l` -gt 0 ] \
+	||  exit 1
+
+ACR_Iso=`grep "ACR_ISO_File"   $DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` \
+       	&& echo "Found ACR iso config : "$ACR_Iso \
+	&& [ -f $ACR_Iso ] \
+	||  exit 2
+
+Rhl_Mnt=`grep "RHEL_ISO_Mount" $DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` \
+	&& echo "Found RHEL mount config : "$Rhl_Mnt \
+	&& [ -d $Rhl_Mnt ] \
+	|| mkdir -p $Rhl_Mnt \
+	|| exit 3
+
+ACR_Mnt=`grep "ACR_ISO_Mount"  $DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` \
+	&& echo "Found ACR  mount config : "$ACR_Mnt \
+	&& [ -d $ACR_Mnt ] \
+	|| mkdir -p $ACR_Mnt \
+	|| exit 4
+echo
+    mountpoint -q $Rhl_Mnt && umount $Rhl_Mnt
+    mount -o ro,loop $Rhl_Iso $Rhl_Mnt \
+	    && echo "ACR iso mounted"
+    mountpoint -q $ACR_Mnt && umount $ACR_Mnt
+    mount -o ro,loop $ACR_Iso $ACR_Mnt \
+	    && echo "ACR iso mounted"
+
+printf "\n... continue ... [Ctrl-C to stop] ?\n\n"
+read
+
+# Customer
+# IP
+# NTP_Server
+# Netmask
+# Default_Route
+# Hostname
+# DNS_Server
+# CRS_Layout
+# NumberOfDisks
+# Keep_Calls
+# NIC
+# ACR_SW_TGZ
+# Keyboard
+# TimeZone
+# ACR_Patch_Dir
+# ACR_TOOLS
+
+exit
+
 if [ -e $Working/target ]; then
 	echo "Clean Target?"
 	read AA
