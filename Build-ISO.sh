@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if [ `id -u` -ne 0 ]
+then
+    echo "Must be root!
+    exit 6
+fi
+
 MyDir=`dirname $0` ; cd $MyDir
 
 # Working=`pwd -P $MyDir`
