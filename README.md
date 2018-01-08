@@ -1,10 +1,14 @@
-_Watch this space_  
----  
+_not close to ready to use_  
+
 # acr-build  
 
-Use **Create-New-Host.sh** to create new hosts.  
-  
-... then **build.sh** to create the iso image.  
-  
+The idea is to generate a single iso image that contains:
 
-
+ * RHEL
+ * Multiple Kickstart configs
+ * ACR Install Software 
+ * ACR Patches
+ * Custom Tools
+ * Menu driven selection of ks.cfg
+ * Auto install OS, Software, Tools and Patches.
+ 
