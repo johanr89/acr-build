@@ -13,6 +13,9 @@ StageTrackFile=$StageTrackPrefix"_"$$".tmp"
 KsCreator="create-an-ACR.sh"
 DefaultsFile="create-an-ACR.variables.cfg"
 Prefix=`grep -i ^prefix $KsCreator | cut -f2 -d\"` 
+TimeOUT="2"
+IsoLabel="ACR-BUILD"
+IsoKSPath="/kickstart"
 
 color_red=$'\033[31;1m'
 color_green=$'\033[32;1m'
@@ -66,10 +69,12 @@ function StageProcess_GetLastEnd {
     return 0
 }
 
-function Stage_1_Pre-Checks {
+function Stage__Pre-Checks {
 
-    PrintMsg yellow "\nStage 1 Start\t" ; PrintMsg normal "Pre-Checks\n"
-    echo "S01:start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    StgNum=$1 
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Pre-Checks\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
     PrintMsg normal "\nCheck root permission\t"
     if [ `id -u` -ne 0 ]; then            # Do you have root permission?
@@ -85,13 +90,13 @@ function Stage_1_Pre-Checks {
         PrintMsg normal "\tNo kickstart definitions found to build."
         return 12
     else
-	KickSFiles=`ls -1 $MyDir/ | grep -i $Prefix`
+	KickSFiles=`ls -1 $MyDir/ | grep -i $Prefix | wc -l`
 	PrintMsg blue "OK"
-        PrintMsg normal "\t$KickSFiles"
+        PrintMsg normal "\tFound: $KickSFiles x ACR host."
     fi
     
     PrintMsg normal "\nCheck Dependencies\t"
-    Deplist="genisoimage"
+    Deplist="genisoimage mount rsync"
     for DEP in $DepList
     do
         which $DEP &>/dev/null
@@ -103,6 +108,7 @@ function Stage_1_Pre-Checks {
         fi
     done
     PrintMsg blue "OK"
+    PrintMsg normal "\t$DepList"
     PrintMsg normal "\n"
 
     PrintMsg normal "Check Working Dir Exist\t"
@@ -124,49 +130,54 @@ function Stage_1_Pre-Checks {
     PrintMsg normal "\n"
 
     PrintMsg normal "Check Workdir clean\t"
+    PrintMsg blue "..."
+
     for Dir in $WorkRHEL $WorkAcrSw $WorkAcrPatch $WorkAcrKickstart
     do
+        PrintMsg normal "\n\t$Dir\t"
         if [ -d $Dir ]
         then
             if [ `find $Dir  -maxdepth 2 -type f 2>/dev/null | wc -l` -gt 0 ] 2>/dev/null
 	    then
                 PrintMsg yellow "WARN"
-                PrintMsg normal "\t$Dir Not empty, may be acceptable ?  \n"
-                PrintMsg yellow "[ C "
-                PrintMsg red "cleanup now"
-                PrintMsg yellow " ]  or  [ A "
-                PrintMsg green " accept not empty"
-                PrintMsg yellow " ] ? "
-		read CleanOrAccept
-		if [ `echo $CleanOrAccept | grep -i c | wc -l` -eq 1 ] && [ -d $Dir ]
-		then
-                        PrintMsg normal "\nCleaning now\t"
-			rm -rf $Dir &>/dev/null
-			mkdir -p $Dir &>/dev/null
-			chown root $Dir &>/dev/null
-    		        chmod u+r,u+w,u+x $Dir &>/dev/null
-		fi
-                PrintMsg normal "\n"
+                PrintMsg normal "\tNot empty, is this acceptable ? "
+                # PrintMsg yellow "[ C "
+                # PrintMsg red "cleanup now"
+                # PrintMsg yellow " ]  or  [ A "
+                # PrintMsg green " accept not empty"
+                # PrintMsg yellow " ] ? "
+		# read CleanOrAccept
+		# if [ `echo $CleanOrAccept | grep -i c | wc -l` -eq 1 ] && [ -d $Dir ]
+		# then
+                #       PrintMsg normal "\nCleaning now\t"
+		# 	rm -rf $Dir &>/dev/null
+		# 	mkdir -p $Dir &>/dev/null
+		# 	chown root $Dir &>/dev/null
+    		#       chmod u+r,u+w,u+x $Dir &>/dev/null
+		# fi
+                # PrintMsg normal "\n"
 	    fi
 	else
             PrintMsg red "FAIL"
-            PrintMsg normal "\t$Directory issue with: $Dir"
+            PrintMsg normal "\tError checking."
             return 15
         fi
     done
+    PrintMsg normal "\nCheck Workdir clean\t"
     PrintMsg blue "OK"
     PrintMsg normal "\n"
 
-    echo "S01:end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage 1 End\t" ; PrintMsg normal "Continue ? [Ctrl-C to stop] "
-    read
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
     return 0
 }
 
-function Stage_2_Mount {
+function Stage__Mount {
 
-    PrintMsg yellow "\nStage 2 Start\t" ; PrintMsg normal "Mount\n"
-    echo "S02:start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Mount\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
     PrintMsg normal "\nCheck Red Hat iso file\t"
     Rhl_Iso=`grep "RHEL_ISO_File" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
@@ -252,16 +263,17 @@ function Stage_2_Mount {
 
     PrintMsg normal "\n"
 
-    echo "S02:end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage 2 End\t" ; PrintMsg normal "Continue ? [Ctrl-C to stop] "
-    read
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
     return 0
 }
 
-function Stage_3_CopyIso {
+function Stage__CopyIso {
 
-    PrintMsg yellow "\nStage 3 Start\t" ; PrintMsg normal "Copy ISO\n"
-    echo "S03:start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Copy ISO\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
     PrintMsg normal "\nRun copy RHEL now\t"
     SizeRhelWork=`du -sk $WorkRHEL | awk '{print $1}'`
@@ -296,16 +308,17 @@ function Stage_3_CopyIso {
     fi
 
     PrintMsg normal "\n"
-    echo "S03:end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage 3 End\t" ; PrintMsg normal "Continue ? [Ctrl-C to stop]\n"
-    read
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
     return 0
 }
 
-function Stage_4_CopyACR {
+function Stage__CopyACR {
 
-    PrintMsg yellow "\nStage 4 Start\t" ; PrintMsg normal "Copy ACR ISO\n"
-    echo "S04:start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Copy ACR ISO\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
     PrintMsg normal "\nRun copy ACR now\t"
     SizeAcrWork=`du -sk $WorkAcrSW | awk '{print $1}'`
@@ -340,9 +353,8 @@ function Stage_4_CopyACR {
     fi
 
     PrintMsg normal "\n"
-    echo "S04:end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage 4 End\t" ; PrintMsg normal "\nContinue ? [Ctrl-C to stop] "
-    read
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
     return 0
 }
 
@@ -358,10 +370,25 @@ function PrepForSed {
 
 }
 
-function Stage_5_Kickstarts {
+function CheckLEN {
 
-    PrintMsg yellow "\nStage 5\t" ; PrintMsg normal "Generate ks.cfg\n"
-    echo "S05:start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+#    echo "DEBUG "$1" len:"`echo $1 | wc -c`
+
+    if [ `echo $1 | wc -c` -gt 1 ] 2>/dev/null
+    then
+        return 0
+    fi
+
+    return 1
+
+}
+
+function Stage__Kickstarts {
+
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Generate ks.cfg\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
     PrintMsg normal "\nRecorder template\t"
     TemplateNormalACR=$MyDir"/template/kickstart-acr.template"
@@ -395,11 +422,12 @@ function Stage_5_Kickstarts {
         PrintMsg normal "\t`echo $Host | sed -e 's/\.\///g'`\t"
         
 	# Keep_Calls
-        HostKeepCalls=`grep \:Keep_Calls $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tKeepCalls : $HostKeepCalls"
+        HostKeepCalls=`grep \:Keep_Calls $Host | cut -f2 -d \=` ; CheckLEN $HostKeepCalls || return $STG
+       	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tKeepCalls : $HostKeepCalls"
 
         #  Hostname #  ___HOSTNAME___
-       	HostFQDN=`grep \:Hostname $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHostname : $HostFQDN"
-
+       	HostFQDN=`grep \:Hostname $Host | cut -f2 -d \=` ; CheckLEN $HostFQDN || return $STG
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHostname : $HostFQDN"
 	WorkingKSOUT=$WorkAcrKickstart/"ks__"`echo $HostFQDN | sed -e 's/\./_/g'`"__.cfg" 
 
 	if [ `echo $HostKeepCalls | egrep -i '(yes)' | egrep -vi '(no)' | wc -l` -gt 0 ]
@@ -412,39 +440,52 @@ function Stage_5_Kickstarts {
 	sed -i 's/___HOSTNAME___/'$HostFQDN'/g' $WorkingKSOUT
 
         #  Keyboard #  ___KEYBOARD___
-        HostKeyboard=`grep \:Keyboard $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tKeyboard : $HostKeyboard"
+        HostKeyboard=`grep \:Keyboard $Host | cut -f2 -d \=` ; CheckLEN $HostKeyboard || return $STG
+       	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tKeyboard : $HostKeyboard"
 	sed -i 's/___KEYBOARD___/'$HostKeyboard'/g' $WorkingKSOUT
 
         #  NIC #  ___NICDEV___
-        HostNic=`grep \:NIC $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNIC : $HostNic"
+        HostNic=`grep \:NIC $Host | cut -f2 -d \=` ; CheckLEN $HostNic || return $STG
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNIC : $HostNic"
 	sed -i 's/___NICDEV___/'$HostNic'/g' $WorkingKSOUT
 
         #  IP #  ___IPADDRESS___
-        HostIpAddress=`grep \:IP $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tIP-Address : $HostIpAddress"
+        HostIpAddress=`grep \:IP $Host | cut -f2 -d \=` ; CheckLEN $HostIpAddress || return $STG
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tIP-Address : $HostIpAddress"
 	sed -i 's/___IPADDRESS___/'$HostIpAddress'/g' $WorkingKSOUT
 
         #  Netmask #  ___NETMASK___
-        HostNetmask=`grep \:Netmask $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNetmask : $HostNetmask"
+        HostNetmask=`grep \:Netmask $Host | cut -f2 -d \=` ; CheckLEN $HostNetmask || return $STG
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNetmask : $HostNetmask"
 	sed -i 's/___NETMASK___/'$HostNetmask'/g' $WorkingKSOUT
 
         #  Default_Route #  ___GATEWAY___
-        HostGateway=`grep \:Default_Route $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tGateway : $HostGateway"
+        HostGateway=`grep \:Default_Route $Host | cut -f2 -d \=` ; CheckLEN $HostGateway || return $STG
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tGateway : $HostGateway"
 	sed -i 's/___GATEWAY___/'$HostGateway'/g' $WorkingKSOUT
 
         #  DNS_Server #  ___NAMESERVER___
-        HostNameServer=`grep \:DNS_Server $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNameServer : $HostNameServer"
+        HostNameServer=`grep \:DNS_Server $Host | cut -f2 -d \=` ; CheckLEN $HostNameServer || return $STG
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNameServer : $HostNameServer"
 	sed -i 's/___NAMESERVER___/'$HostNameServer'/g' $WorkingKSOUT
 
         #  TimeZone #  ___TIMEZONE___
-        HostTZ=`grep \:TimeZone $Host | cut -f2 -d \= | sed -e 's/\//\\\\\//g'` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tTimeZone : $HostTZ"
+        HostTZ=`grep \:TimeZone $Host | cut -f2 -d \= | sed -e 's/\//\\\\\//g'` ; CheckLEN $HostTZ || return $STG
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tTimeZone : $HostTZ"
 	sed -i 's/___TIMEZONE___/'${HostTZ}'/g' $WorkingKSOUT
 
         #  NTP_Server #  ___NTPSERVER___
-        HostNTP=`grep \:NTP_Server $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNTP : $HostNTP"
+        HostNTP=`grep \:NTP_Server $Host | cut -f2 -d \=` ; CheckLEN $HostNTP || return $STG
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNTP : $HostNTP"
 	sed -i 's/___NTPSERVER___/'$HostNTP'/g' $WorkingKSOUT
 
+        HostCust=`grep \:Customer $Host | cut -f2 -d \= | sed -e 's/\ /\\\\\ /g'` ; CheckLEN $HostCust || return $STG
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tTimeZone : $HostCust"
+	export $HostCust
+
         # NumberOfDisks
-        HostNumOfDisk=`grep \:NumberOfDisks $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNumberOfDisks : $HostNumOfDisks"
+        HostNumOfDisk=`grep \:NumberOfDisks $Host | cut -f2 -d \=` 
+	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNumberOfDisks : $HostNumOfDisks"
 
 	if [ `echo $HostNumOfDisk | egrep -i '(2|two)' | wc -l` -ge 1 ]
 	then
@@ -506,6 +547,13 @@ function Stage_5_Kickstarts {
 
         fi
 
+        CheckLEN $HostLineBoot     || return $STG
+        CheckLEN $HostLineRoot     || return $STG
+        CheckLEN $HostLineWitness  || return $STG
+        CheckLEN $HostLinePostgres || return $STG
+        CheckLEN $HostLineSwap     || return $STG
+        CheckLEN $HostLineCalls    || return $STG
+
 	echo $HostLineBoot >> $WorkingKSOUT     ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHost Line Boot : $HostLineBoot"
 	echo $HostLineRoot >> $WorkingKSOUT     ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHost Line Root : $HostLineRoot"
 	echo $HostLinePostgres >> $WorkingKSOUT ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHost Line Postgres : $HostLinePostgres"
@@ -523,17 +571,10 @@ function Stage_5_Kickstarts {
     PrintMsg blue "OK"
     PrintMsg normal "\n"
 
-    echo "S05:end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage 5 End\t" ; PrintMsg normal "Continue ? [Ctrl-C to stop] "
-    read
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
     return 0
 
-#___PARTLINE_BOOT___
-#___PARTLINE_WITNESS___
-#___PARTLINE_PGSQL___
-#___PARTLINE_SWAP___
-#___PARTLINE_CALLS___
-# Customer
 # CRS_Layout
 # ACR_SW_TGZ
 # ACR_Patch_Dir
@@ -567,26 +608,162 @@ function Stage_5_Kickstarts {
 #WorkAcrPatch=$WorkMain"/workACR-patch"
 
 }
+function Stage__ISOLUNUX {
+
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "RHEL Menu\n"
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    exit 1 
+    # HostCust
+
+    PrintMsg normal "\nCheck isolinux template\t"
+
+      TemplateISODefault=$MyDir"/template/isolinux-default.template"
+      TemplateISOaSingle=$MyDir"/template/isolinux-single.template"
+      TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
+
+    PrintMsg normal "\nCheck iso ks-path\t"
+    [ -d ${WorkRHEL}${IsoKSPath} ] || mkdir -p ${WorkRHEL}${IsoKSPath} 
+    if [ -d ${WorkRHEL}${IsoKSPath} ]
+    then
+	IsoKsDest=${WorkRHEL}${IsoKSPath}
+        PrintMsg blue "OK"
+        PrintMsg normal "\tFound: ${WorkRHEL}${IsoKSPath}"
+    else
+        PrintMsg red "FAIL"
+        PrintMsg normal "\tNot found: ${WorkRHEL}${IsoKSPath}"
+	return $STG
+    fi
+
+    if [ -f $TemplateISODefault ] && [ -f $TemplateISOaSingle ] && [ -f $TemplateISOtoFinal ]
+    then
+        PrintMsg blue "OK"
+        PrintMsg normal "\tFound 3x required"
+    else
+        PrintMsg red "FAIL"
+        PrintMsg normal "\tNot all are available."
+	return $STG
+    fi
+
+    PrintMsg normal "\nCollect variales\t"
+
+      CheckLEN $HostCust   || exit 1
+      IsoHostTitle=$HostCust__`date +%F`         # isolinux-default.template  ___Title___ 
+
+      CheckLEN $IsoLabel   || exit 2
+      IsoHdLabel=$IsoLabel                       # isolinux-default.template  ___HdLabel___           # IsoLabel
+
+      IsoSubMenu="ACR-BUILD" 
+      CheckLEN $IsoSubMenu || exit 3                    # isolinux-default.template  ___SubMenu___           # HostCust
+
+    PrintMsg blue "OK"
+    PrintMsg normal "\t"
+
+
+#            cp ${WorkRHEL}"/isolinux/isolinux.cfg" ${WorkRHEL}"/isolinux/.isolinux.cfg_"`date +%F`"_"$$
+#	    cat $TemplateISODefault > ${WorkRHEL}"/isolinux/isolinux.cfg"
+    if [ `ls -1 $WorkAcrKickstart/ks__*.cfg | wc -l` -gt 1 ]
+    then
+        PrintMsg normal "\nIndividual Host Files\t"
+        PrintMsg blue "..."
+
+	cd $WorkAcrKickstart/
+        for AcrKsFile in `ls -1 ks__*.cfg`
+	do
+            PrintMsg normal "\n\t$AcrKsFile\t" 
+	    IsoSingleLable=`echo $AcrKsFile | sed -e 's/\.cfg//g' | cut -c 4-999` # isolinux-single.template   ___SingleLabel___       # File ?
+	    IsoSingleMenuText=$IsoSingleLable # isolinux-single.template   ___SingleMenuText___    # FQDN ?
+	    IsoSingleMenuHelpText="install_It_Now" # isolinux-single.template   ___SingleHelpText___    # IP ?
+	    IsoSingleMenuHdLabel=$IsoHdLabel # isolinux-single.template   ___HdLabel___           # IsoLabel
+	    IsoSingleFullPathKsFile=$IsoKSPath"/"$AcrKsFile    # ="/kickstart" # isolinux-single.template   ___FullPathToKsCfg___   # /kickstart/
+
+	    cp -f $AcrKsFile $IsoKsDest/. || exit 77
+
+
+            # TemplateISOaSingle=$MyDir"/template/isolinux-single.template"
+            # TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
+
+	done
+    fi
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
+    return 0
+
+}
+
+function Stage__ACRPatches {
+
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Patch Collection\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
+    return 0
+}
+
+function Stage__ACRTools {
+
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "acr-tools\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
+    return 0
+}
+
+function Stage__Combiner {
+
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Combiner\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
+    return 0
+}
+
+function Stage__GenISOImage {
+
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Gen-ISO\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
+    return 0
+}
+
+function Stage__Cleanup {
+
+    StgNum=$1
+
+    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Cleanup\n"
+    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+
+    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
+    return 0
+}
+
 function ErrorStatus {
 
-    if [ $# -eq 1 ]
-    then
-        Error_Code=$1
-	if [ $Error_Code -ne 0 ]
+        ErrCode=$1
+
+	if [ $ErrCode -ne 0 ]
 	then
-            echo
-	    echo "Error Exit "$Error_Code
-	    echo
-	    exit $Error_Code
+	    echo "Error Exit "$ErrCode
+	    exit 1
         else
             return 0
         fi
-    else
-        echo
-	echo " OOPSIE "$*
-        echo
-	exit 999
-    fi
+	echo " OOPSIE "; exit 999
 }
 
 function Question {
@@ -622,7 +799,7 @@ DEBUG=false
 #DEBUG=true
 
 StageCurrent="S00"
-StageLast="S10"
+StageLast="S11"
 
 StageLast=`StageProcess_GetLastEnd` 2>/dev/null || StageLast="S00" ; [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "\nDEBUG\tStageLast returned as $StageLast\n" 
 
@@ -633,9 +810,9 @@ else
 	Question "Resume after last completed stage? $StageLast"
 	if [ $? -eq 0 ] 2>/dev/null
 	then
-            StageCurrent=$StageLast 
+            StageCurrent=`echo $StageLast | sed -e 's/S//g'`
         else
-            StageCurrent="S00"
+            StageCurrent="00"
 	fi
 	PrintMsg normal "\n"
         rm -f /tmp/.build_iso_stage_tracker_*.tmp 2>/dev/null
@@ -645,44 +822,78 @@ fi
 
 while [ $StageCurrent <> $StageLast ]
 do
+    for STG in `seq -w $StageCurrent 1 11`
+    do
+
     [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "DEBUG\tEnter while $StageCurrent not $StageLast\n"
 
     PrintMsg normal "\n"
-    PrintMsg blue "================================================================="
+    PrintMsg red "================================================================="
     PrintMsg normal "\n"
 
-    if [ $StageCurrent = S00 ] 
+
+    if [ $STG = "00" ] 
     then
-        Stage_1_Pre-Checks
+        Stage__Pre-Checks $STG
         ErrorStatus $?
     fi
-    if [ $StageCurrent = S01 ]
+    if [ $STG = "01" ]
     then
-        Stage_2_Mount
+        Stage__Mount $STG
         ErrorStatus $?
     fi
-    if [ $StageCurrent = S02 ]
+    if [ $STG = "02" ]
     then
-        Stage_3_CopyIso
+        Stage__CopyIso $STG
         ErrorStatus $?
     fi
-    if [ $StageCurrent = S03 ]
+    if [ $STG = "03" ]
     then
-        Stage_4_CopyACR
+        Stage__CopyACR $STG
         ErrorStatus $?
     fi
-    if [ $StageCurrent = S04 ]
+    if [ $STG = "04" ]
     then
-        Stage_5_Kickstarts
+        Stage__Kickstarts $STG
         ErrorStatus $?
     fi
-    if [ $StageCurrent = S05 ]
+    if [ $STG = "05" ]
     then
-	StageCurrent=$StageLast
+	Stage__ISOLUNUX $STG
+        ErrorStatus $?
+    fi
+    if [ $STG = "06" ]
+    then
+	Stage__ACRPatches $STG
+        ErrorStatus $?
+    fi
+    if [ $STG = "07" ]
+    then
+	Stage__ACRTools $STG
+        ErrorStatus $?
+    fi
+    if [ $STG = "08" ]
+    then
+	Stage__Combiner $STG
+        ErrorStatus $?
+    fi
+    if [ $STG = "09" ]
+    then
+	Stage__GenISOImage $STG
+        ErrorStatus $?
+    fi
+    if [ $STG = "10" ]
+    then
+	Stage__Cleanup $STG
+        ErrorStatus $?
+    fi
+    if [ $STG = "11" ]
+    then
         exit 0
     fi
 
-    StageCurrent=`StageProcess_GetLastEnd` 
+#    StageCurrent=`StageProcess_GetLastEnd` 
+    done
 
 done
 
