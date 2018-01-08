@@ -364,8 +364,8 @@ function Stage_5_Kickstarts {
     echo "S05:start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
     PrintMsg normal "\nRecorder template\t"
-    TemplateNormalACR=$MyDir"/kickstart-acr.template"
-    TemplatePostACR=$MyDir"/kickstart-post.template"
+    TemplateNormalACR=$MyDir"/template/kickstart-acr.template"
+    TemplatePostACR=$MyDir"/template/kickstart-post.template"
     if [ -f $TemplateNormalACR ] && [ -f $TemplatePostACR ]
     then
         if [ `grep -v ^# $TemplateNormalACR | grep ___ | wc -l` -gt 1 ]

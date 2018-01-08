@@ -1,0 +1,113 @@
+default vesamenu.c32
+timeout 600
+
+display boot.msg
+
+# Clear the screen when exiting the menu, instead of leaving the menu displayed.
+# For vesamenu, this means the graphical background is still displayed without
+# the menu itself for as long as the screen remains in graphics mode.
+menu clear
+menu background splash.png
+menu title A O N  __ACR_v15-fp2__Nov17
+menu vshift 8
+menu rows 18
+menu margin 8
+#menu hidden
+menu helpmsgrow 15
+menu tabmsgrow 13
+
+# Border Area
+menu color border * #00000000 #00000000 none
+
+# Selected item
+menu color sel 0 #ffffffff #00000000 none
+
+# Title bar
+menu color title 0 #ff7ba3d0 #00000000 none
+
+# Press [Tab] message
+menu color tabmsg 0 #ff3a6496 #00000000 none
+
+# Unselected menu item
+menu color unsel 0 #84b8ffff #00000000 none
+
+# Selected hotkey
+menu color hotsel 0 #84b8ffff #00000000 none
+
+# Unselected hotkey
+menu color hotkey 0 #ffffffff #00000000 none
+
+# Help text
+menu color help 0 #ffffffff #00000000 none
+
+# A scrollbar of some type? Not sure.
+menu color scrollbar 0 #ffffffff #ff355594 none
+
+# Timeout msg
+menu color timeout 0 #ffffffff #00000000 none
+menu color timeout_msg 0 #ffffffff #00000000 none
+
+# Command prompt text
+menu color cmdmark 0 #84b8ffff #00000000 none
+menu color cmdline 0 #ffffffff #00000000 none
+
+# Do not display the actual menu unless the user presses a key. All that is displayed is a timeout message.
+
+menu tabmsg Press Tab for full 
+
+menu separator # insert an empty line
+menu separator # insert an empty line
+
+label local
+  menu label ^boot from local HD
+  menu default
+  localboot 0xffff
+
+label linux
+  menu label ^Install Standard RHEL 7.2
+  kernel vmlinuz
+  append initrd=initrd.img inst.stage2=hd:LABEL=CUSTOM-RHEL
+
+label resque
+  menu label ^Live boot. Revive, Partition, etc.
+  endtext
+  kernel vmlinuz
+  append initrd=initrd.img inst.stage2=hd:LABEL=CUSTOM-RHEL rescue 
+
+menu separator # insert an empty line
+
+
+menu begin CUSTOM_RHEL
+  menu title CUSTOM RHEL
+  text help
+    NOTE  backups: ACR, DB
+    Partition and format
+  endtext
+
+label rescue
+  menu label LIVE OS
+  text help
+    DSK: AvB,sdA 1b_500 2r_15G 3w_15G 4v_Grow
+  endtext
+  kernel vmlinuz
+  append initrd=initrd.img inst.stage2=hd:LABEL=CUSTOM-RHEL rescue 
+ 
+menu separator # insert an empty line
+
+  
+label linux_ks_ks_MASTER.cfg
+    menu label Install using ks_MASTER.cfg
+    text help
+        ACR: verAE,arc,stopi,prop,pem,ssh,etc x2
+        DBA: dmpAIP,md5,jQ-no,inum,sh.auth    x2
+    endtext
+    kernel vmlinuz
+append initrd=initrd.img inst.text inst.ks=hd:LABEL=CUSTOM-RHEL:/ks/ks_MASTER.cfg
+
+menu separator # insert an empty line
+
+label returntomain
+  menu label Return to ^main menu
+  menu exit
+
+menu end

@@ -1,0 +1,8 @@
+isolinux-single.template   ___SingleLabel___
+isolinux-single.template   ___SingleMenuText___
+isolinux-single.template   ___SingleHelpText___
+isolinux-single.template   ___HdLabel___
+isolinux-single.template   ___FullPathToKsCfg___
+isolinux-default.template  ___Title___
+isolinux-default.template  ___HdLabel___
+isolinux-default.template  ___SubMenu___
