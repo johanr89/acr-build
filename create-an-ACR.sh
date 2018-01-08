@@ -1,11 +1,12 @@
 #!/bin/bash
 
-File_Kickstart_Defaults="ks-variables.cfg"
 
 
 #####   MAIN   #####
 
 MyDir=`dirname $0`
+MyTemplates=$MyDir"/template"
+File_Kickstart_Defaults="create-an-ACR.variables.cfg"
 
 Temp="/tmp/ks-details_"$$".tmp" && [ -f $Temp ] && rm -f $Temp
 NewT="/tmp/ks-newTemp_"$$".tmp"     && [ -f $NewT ] && rm -f $NewT
@@ -15,11 +16,11 @@ Confirm="z"
 IsThisTheFirst="yes"
 PrefixNewKS="Host_Config_KS"
 
-if [ -f $MyDir/$File_Kickstart_Defaults ]
+if [ -f $MyTemplates/$File_Kickstart_Defaults ]
 then
 
-    CountMax=`grep -v ^# $MyDir/$File_Kickstart_Defaults | grep \= | wc -l`
-    grep -v ^# $MyDir/$File_Kickstart_Defaults | sort -n  > $Temp
+    CountMax=`grep -v ^# $MyTemplates/$File_Kickstart_Defaults | grep \= | wc -l`
+    grep -v ^# $MyTemplates/$File_Kickstart_Defaults | sort -n  > $Temp
 
     while [ `echo $Confirm | grep -i "y" | wc -l` -lt 1 ] 2>/dev/null
     do

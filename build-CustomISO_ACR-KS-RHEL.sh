@@ -11,7 +11,7 @@ StageTrackPrefix="/tmp/.build_iso_stage_tracker"
 StageTrackFile=$StageTrackPrefix"_"$$".tmp"
 
 KsCreator="create-an-ACR.sh"
-DefaultsFile="ks-variables.cfg"
+DefaultsFile="create-an-ACR.variables.cfg"
 Prefix=`grep -i ^prefix $KsCreator | cut -f2 -d\"` 
 
 color_red=$'\033[31;1m'
@@ -169,7 +169,7 @@ function Stage_2_Mount {
     echo "S02:start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
     PrintMsg normal "\nCheck Red Hat iso file\t"
-    Rhl_Iso=`grep "RHEL_ISO_File"  $DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
+    Rhl_Iso=`grep "RHEL_ISO_File" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
     if [ `ls $Rhl_Iso 2>/dev/null | wc -l` -gt 0 ]
     then
 	PrintMsg blue "OK"
@@ -181,7 +181,7 @@ function Stage_2_Mount {
     fi
 
     PrintMsg normal "\nCheck ACR iso file\t"
-    ACR_Iso=`grep "ACR_ISO_File"   $DefaultsFile | cut -f2 -d \: | cut -f2 -d \=`
+    ACR_Iso=`grep "ACR_ISO_File" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=`
     if [ `ls $ACR_Iso 2>/dev/null | wc -l` -gt 0 ]
     then
 	PrintMsg blue "OK"
@@ -193,7 +193,7 @@ function Stage_2_Mount {
     fi
 
     PrintMsg normal "\nCheck RHEL mount dir\t"
-    Rhl_Mnt=`grep "RHEL_ISO_Mount" $DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
+    Rhl_Mnt=`grep "RHEL_ISO_Mount" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
     [ -d $Rhl_Mnt ] || mkdir -p $Rhl_Mnt
     mountpoint -q $Rhl_Mnt && umount $Rhl_Mnt
 
@@ -209,7 +209,7 @@ function Stage_2_Mount {
     fi
 
     PrintMsg normal "\nCheck ACR mount dir\t"
-    ACR_Mnt=`grep "ACR_ISO_Mount"  $DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
+    ACR_Mnt=`grep "ACR_ISO_Mount" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
     [ -d $ACR_Mnt ] || mkdir -p $ACR_Mnt
     mountpoint -q $ACR_Mnt && umount $ACR_Mnt
 
@@ -386,11 +386,13 @@ function Stage_5_Kickstarts {
     [ -d $WorkAcrKickstart ] || mkdir -p $WorkAcrKickstart 
     rm -f $WorkAcrKickstart/ks_*.cfg 2>/dev/null
 
-    PrintMsg normal "\n\n"
+    PrintMsg normal "\n\nBUILD:\t$WorkAcrKickstart\t"
+    PrintMsg blue "..."
+    PrintMsg normal "\n"
 
     for Host in `ls -1 ${MyDir}/${Prefix}*`
     do
-        PrintMsg normal "\t$Host\t"
+        PrintMsg normal "\t`echo $Host | sed -e 's/\.\///g'`\t"
         
 	# Keep_Calls
         HostKeepCalls=`grep \:Keep_Calls $Host | cut -f2 -d \=` ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tKeepCalls : $HostKeepCalls"
@@ -517,6 +519,9 @@ function Stage_5_Kickstarts {
         PrintMsg normal "\n"
 
     done
+    PrintMsg normal "BUILD:\t$WorkAcrKickstart\t"
+    PrintMsg blue "OK"
+    PrintMsg normal "\n"
 
     echo "S05:end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
     PrintMsg yellow "\nStage 5 End\t" ; PrintMsg normal "Continue ? [Ctrl-C to stop] "
@@ -596,14 +601,11 @@ function Question {
 
         if [ `echo $Answer | grep -i "y" | wc -l` -ge 1 ] 2>/dev/null
 	then
-            echo yes
             return 0
         elif [ `echo $Answer | grep -i "n" | wc -l` -ge 1 ] 2>/dev/null
 	then
-            echo no
             return 1
         else
-            echo huh
             return 3
         fi
 }
@@ -622,22 +624,24 @@ DEBUG=false
 StageCurrent="S00"
 StageLast="S10"
 
-StageLast=`StageProcess_GetLastEnd` ; [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "\nDEBUG\tStageLast returned as $StageLast\n" 
+StageLast=`StageProcess_GetLastEnd` 2>/dev/null || StageLast="S00" ; [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "\nDEBUG\tStageLast returned as $StageLast\n" 
 
-File=`ls -1tr /tmp/.build* | tail -1`
-if [ $StageLast = $StageCurrent ] || [ `grep \:end $File | wc -l` -gt 0 ] 2>/dev/null
+if [ $StageLast = $StageCurrent ] 2>/dev/null
 then
     StageCurrent="S00"
 else
 	Question "Resume after last completed stage? $StageLast"
-	if [ $? -eq 0 ]
+	if [ $? -eq 0 ] 2>/dev/null
 	then
             StageCurrent=$StageLast 
         else
             StageCurrent="S00"
 	fi
 	PrintMsg normal "\n"
+        rm -f /tmp/.build_iso_stage_tracker_*.tmp 2>/dev/null
+        echo $StageCurrent":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 fi
+
 
 while [ $StageCurrent <> $StageLast ]
 do
