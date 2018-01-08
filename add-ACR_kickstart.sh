@@ -1,10 +1,20 @@
 #!/bin/bash
 
+#  |////////////////////////////////////
+#  ||
+#  ||
+#  ||
+#  ||
+#  |\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 
-#####   MAIN   #####
+MyDir=`dirname $0`    # Where ami I?
+cd $MyDir             # Here I am ...
 
-MyDir=`dirname $0`
+#  |--------------------------------------
+#  |      ==>   VARIABLES   <== 
+#  |--------------------------------------
+ 
 MyTemplates=$MyDir"/template"
 File_Kickstart_Defaults="create-an-ACR.variables.cfg"
 
@@ -15,6 +25,71 @@ CountMin="01"
 Confirm="z"
 IsThisTheFirst="yes"
 PrefixNewKS="Host_Config_KS"
+
+#  Some pretty colours
+#
+      color_red=$'\033[31;1m'
+    color_green=$'\033[32;1m'
+   color_yellow=$'\033[33;1m'
+     color_blue=$'\033[34;1m'
+   color_normal=$'\033[0m'
+
+###############################################
+#
+#   ||====================================
+#   ||
+#   ||      ==>   FUNCTIONS   <== 
+#   ||
+#   ||------------------------------------
+#
+
+function PrintMsg {      # Use the pretty colours
+
+#  USAGE:
+#          PrintMsg yellow "Look I'm Yellow!"
+
+case $1 in
+"red")
+        printf "%s$2" "$color_red"
+        ;;
+"green")
+        printf "%s$2" "$color_green"
+        ;;
+"yellow")
+        printf "%s$2" "$color_yellow"
+        ;;
+"blue")
+        printf "%s$2" "$color_blue"
+        ;;
+"normal")
+        printf "%s$2" "$color_normal"
+        ;;
+*)
+        printf "\n\tUsage:\n\t\tPrtMsg "
+        printf "%sred " "$color_red"
+        printf "%sgreen " "$color_green"
+        printf "%syellow " "$color_yellow"
+        printf "%sblue " "$color_blue"
+        printf "%snormal " "$color_normal"
+        printf " \"Hello World\"\n\n"
+        ;;
+esac
+
+}
+
+##########################################################
+##
+##           MAIN
+##
+##########################################################
+
+PrintMsg yellow "\nINFO\n\n\t$0"
+PrintMsg red    "\tCollect a single ACR host's Kickstart configuration, to build the ISO\n"
+PrintMsg normal "\n\t1st run will offer the minimum config to enter."
+PrintMsg normal "\n\t2nd will offer all the more detailed, and assumed configuration."
+PrintMsg normal "\n\t... repeated thereafter, or until you ACCEPT\n"
+PrintMsg yellow "\n---------------------------------------------------------------------------"
+PrintMsg normal "\n"
 
 if [ -f $MyTemplates/$File_Kickstart_Defaults ]
 then

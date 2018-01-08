@@ -600,6 +600,7 @@ function Stage__Kickstarts {
 #WorkAcrPatch=$WorkMain"/workACR-patch"
 
 }
+
 function Stage__ISOLUNUX {
 
     StgNum=$1
@@ -657,14 +658,17 @@ function Stage__ISOLUNUX {
 
     PrintMsg normal "\nInitiate isolinux\t"
 
-      if [ -f ${WorkRHEL}"/isolinux/isolinux.cfg" ]
+      if [ -f $WorkRHEL/isolinux/isolinux.cfg ]
       then
-          cp ${WorkRHEL}"/isolinux/isolinux.cfg" ${WorkRHEL}"/isolinux/.isolinux.cfg_"`date +%F`"_"$$ \
-              && cat $TemplateISODefault > ${WorkRHEL}"/isolinux/isolinux.cfg"
-              && PrintMsg blue "OK" 
-	      [ $? -ne 0 ] && PrintMsg red "FAIL" \
-	                   && return 87
+
+          cp $WorkRHEL/isolinux/isolinux.cfg $WorkRHEL/isolinux/.isolinux.cfg_`date +%F`_$$ 
+          cat $TemplateISODefault > $WorkRHEL/isolinux/isolinux.cfg
+          PrintMsg blue "OK" 
+
+	  [ $? -ne 0 ] && PrintMsg red "FAIL" && return 87
+
       else
+
           PrintMsg red "FAIL"
 	  return 87
       fi
@@ -841,7 +845,7 @@ DEBUG=false
 StageCurrent="S00"
 StageLast="S11"
 
-StageLast=`StageProcess_GetLastEnd` 2>/dev/null || StageLast="S00" ; [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "\nDEBUG\tStageLast returned as $StageLast\n" 
+#StageLast=`StageProcess_GetLastEnd` 2>/dev/null || StageLast="S00" ; [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "\nDEBUG\tStageLast returned as $StageLast\n" 
 
 if [ $StageLast = $StageCurrent ] 2>/dev/null
 then
