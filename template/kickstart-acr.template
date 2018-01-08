@@ -1,0 +1,36 @@
+install
+cdrom
+text
+reboot
+lang en_US.UTF-8
+keyboard --vckeymap=___KEYBOARD___ --xlayouts=___KEYBOARD___
+#
+# Configure the NIC - comment this line out if using bonded NIC
+network --device=___NICDEV___ --bootproto=static --ip=___IPADDRESS___ --netmask=___NETMASK___ --gateway=___GATEWAY___ --nameserver=___NAMESERVER___ --hostname=___HOSTNAME___
+# To add additional NIC(s), uncomment, copy if necessary and edit the line below
+# Note that the additional devices must not be in the same subnet as the first NIC nor each other - use bonding to achieve that
+#network --device=eth1 --bootproto=static --ip=10.10.10.123 --netmask=255.255.255.0
+#
+# To bond multiple NICs, uncomment and edit the following line and comment out the network line above (RHEL 7 only)
+#network --device=bond0 --bondslaves=eth0,eth1 --bootproto=static --ip=192.168.0.145 --netmask=255.255.255.0 --gateway=192,168.0.1 --nameserver=192,168.0.1 --hostname=test-ACR-01.local.domain
+# Note: you will probably have to delete the following files after first boot: /etc/sysconfig/network-scripts/ifcfg-ens1 (or whatever the raw device is). Leave the ifcfg-bond0* files
+#
+rootpw --iscrypted $6$OYoqXwol7DyzpU6L$VLnNskioMgMrJfzc4tehqa7l1qfwhITJg27iSquoOopgBrKPpz./.Er3JbD8mwFZnUbJHN7mxPXLVb3QAk0uA/
+auth --useshadow --passalgo=sha512
+firewall --disabled
+selinux --disabled
+firstboot --disabled
+timezone ___TIMEZONE___ --utc --ntpservers=___NTPSERVER___
+services --enabled chronyd --disabled cups
+#
+# Disk partitions....
+#
+bootloader --location=mbr
+# clearpart --all --initlabel
+clearpart --all --initlabel
+#
+# The default one disk (or RAID array) partitioning - *without* volgroup 
+# If there is more than one disk, either add --ondisk=xxx to each of the partitions or use the volgroup example below instead
+# When using --ondisk make sure that exactly one partition per drive has --grow (i.e. with 2 drives allow /var/lib/pgsql to consume the balance of the first drive)
+# Edit partition sizes as desired to meet the minimums in the installation manual
+#
