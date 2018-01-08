@@ -84,6 +84,16 @@ function Stage__Pre-Checks {
 	PrintMsg blue "OK"
     fi
 
+    PrintMsg normal "\nCheck Linux disto.\t"
+    if [ `uname -a | grep -i debian | wc -l` -lt 1 ]; then    # Is this Dedian ?
+	PrintMsg red "FAIL"
+	PrintMsg normal "\tBuilt using deb like, ubuntu or kali. This seems different."
+        return 19
+    else
+	PrintMsg blue "OK"
+	PrintMsg normal "\tDebian looks good - any flavour may do."
+    fi
+
     PrintMsg normal "\nCheck Kickstart details\t"
     if [ `find $MyDir -type f | grep -i $Prefix | wc -l` -lt 1 ]; then         # Are there a minimum of one host definitions ?
 	PrintMsg red "FAIL"
@@ -358,29 +368,11 @@ function Stage__CopyACR {
     return 0
 }
 
-function PrepForSed {
+function CheckLEN { # checks if it has some characters
 
-    if [ $# -gt 0 ]
-    then
-        echo $1 | sed -e 's/\ /\\\ /g' | sed -e 's/\-/\\\-/g' | sed -e 's/\=/\\\=/g' | sed -e 's/\//\\\\\//g' 
-	return 0
-    else
-        return 1
-    fi
-
-}
-
-function CheckLEN {
-
-#    echo "DEBUG "$1" len:"`echo $1 | wc -c`
-
-    if [ `echo $1 | wc -c` -gt 1 ] 2>/dev/null
-    then
-        return 0
-    fi
-
+    [ `echo $1 | wc -c` -gt 1 ] \
+	    && return 0
     return 1
-
 }
 
 function Stage__Kickstarts {
@@ -614,7 +606,9 @@ function Stage__ISOLUNUX {
 
     PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "RHEL Menu\n"
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    exit 1 
+
+    echo DEBUG exit ; exit 1 ######################################################################
+
     # HostCust
 
     PrintMsg normal "\nCheck isolinux template\t"
@@ -661,8 +655,30 @@ function Stage__ISOLUNUX {
     PrintMsg normal "\t"
 
 
-#            cp ${WorkRHEL}"/isolinux/isolinux.cfg" ${WorkRHEL}"/isolinux/.isolinux.cfg_"`date +%F`"_"$$
-#	    cat $TemplateISODefault > ${WorkRHEL}"/isolinux/isolinux.cfg"
+    PrintMsg normal "\nInitiate isolinux\t"
+
+      if [ -f ${WorkRHEL}"/isolinux/isolinux.cfg" ]
+      then
+          cp ${WorkRHEL}"/isolinux/isolinux.cfg" ${WorkRHEL}"/isolinux/.isolinux.cfg_"`date +%F`"_"$$ \
+              && cat $TemplateISODefault > ${WorkRHEL}"/isolinux/isolinux.cfg"
+              && PrintMsg blue "OK" 
+	      [ $? -ne 0 ] && PrintMsg red "FAIL" \
+	                   && return 87
+      else
+          PrintMsg red "FAIL"
+	  return 87
+      fi
+
+    PrintMsg normal "\nMain isolinux bits\t"
+
+      #
+      #
+      #
+      # isolinux-default.template  ___Title___
+      # isolinux-default.template  ___HdLabel___
+      # isolinux-default.template  ___SubMenu___
+
+    PrintMsg normal "\nEack kickstart\t"
     if [ `ls -1 $WorkAcrKickstart/ks__*.cfg | wc -l` -gt 1 ]
     then
         PrintMsg normal "\nIndividual Host Files\t"
@@ -680,12 +696,36 @@ function Stage__ISOLUNUX {
 
 	    cp -f $AcrKsFile $IsoKsDest/. || exit 77
 
+	    TestSingle=0
+            cat $TemplateISOaSingle > /tmp/.isolinux_$IsoSingleLable_$$.tmp || TestSingle=1
 
-            # TemplateISOaSingle=$MyDir"/template/isolinux-single.template"
-            # TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
+            #
+            #
+            #
+            # isolinux-single.template   ___SingleLabel___
+            # isolinux-single.template   ___SingleMenuText___
+            # isolinux-single.template   ___SingleHelpText___
+            # isolinux-single.template   ___HdLabel___
+            # isolinux-single.template   ___FullPathToKsCfg___
+             
+	    if [ $TestSingle -eq 0 ]
+            then
+                cat /tmp/.isolinux_$IsoSingleLable_$$.tmp >> ${WorkRHEL}"/isolinux/isolinux.cfg" \
+                  && mv /tmp/.isolinux_$IsoSingleLable_$$.tmp /tmp/.isolinux_$IsoSingleLable_$$.done 
+
+                PrintMsg blue "OK"
+                PrintMsg normal "\t"
+            else
+                PrintMsg red "FAIL"
+                PrintMsg normal "\t"
+		return 65
+            fi
 
 	done
     fi
+
+    # TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
+
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
     PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
     return 0
