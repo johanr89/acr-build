@@ -1,5 +1,6 @@
 #!/bin/bash
 
+IsoLabel="ACR_BUILD"
 WorkMain="/root/Desktop/acr-build-ISO-WorkMain"
 WorkRHEL=$WorkMain"/workRHEL"
 WorkAcrSw=$WorkMain"/workACR-software"
@@ -13,9 +14,9 @@ StageTrackFile=$StageTrackPrefix"_"$$".tmp"
 KsCreator="create-an-ACR.sh"
 DefaultsFile="create-an-ACR.variables.cfg"
 Prefix=`grep -i ^prefix $KsCreator | cut -f2 -d\"` 
-TimeOUT="2"
-IsoLabel="ACR-BUILD"
-IsoKSPath="/kickstart"
+TimeOUT="1"
+IsoSubMenu="ACR_kickstart"
+IsoKSPath="kickstart"
 
 color_red=$'\033[31;1m'
 color_green=$'\033[32;1m'
@@ -23,7 +24,14 @@ color_yellow=$'\033[33;1m'
 color_blue=$'\033[34;1m'
 color_normal=$'\033[0m'
 
-MyDir=`dirname $0` ; cd $MyDir
+MeThinkIm=`dirname $0`               # Find Me
+[ $? -ne 0 ] && exit 911             # Find Me
+    cd $MeThinkIm                    # Find Me
+    [ $? -ne 0 ] && exit 912         # Find Me
+        MyDir=`pwd -P`               # Find Me
+        [ $? -ne 0 ] && exit 913     # Find Me
+            cd $MyDir                # Find Me
+            [ $? -ne 0 ] && exit 914 # Find Me
 
 function PrintMsg {
 
@@ -85,7 +93,8 @@ function Stage__Pre-Checks {
     fi
 
     PrintMsg normal "\nCheck Linux disto.\t"
-    if [ `uname -a | grep -i debian | wc -l` -lt 1 ]; then    # Is this Dedian ?
+    if [ `uname -a | grep -i "debian" | wc -l` -lt 1 ]    # Is this Dedian ?
+    then
 	PrintMsg red "FAIL"
 	PrintMsg normal "\tBuilt using deb like, ubuntu or kali. This seems different."
         return 19
@@ -95,12 +104,13 @@ function Stage__Pre-Checks {
     fi
 
     PrintMsg normal "\nCheck Kickstart details\t"
-    if [ `find $MyDir -type f | grep -i $Prefix | wc -l` -lt 1 ]; then         # Are there a minimum of one host definitions ?
+    if [ `find $MyDir -type f -name "Host_Config*" | wc -l` -lt 1 ]         # Are there a minimum of one host definitions ?
+    then
 	PrintMsg red "FAIL"
         PrintMsg normal "\tNo kickstart definitions found to build."
         return 12
     else
-	KickSFiles=`ls -1 $MyDir/ | grep -i $Prefix | wc -l`
+	KickSFiles=`ls -1 $MyDir/ | grep "Host_Config" | wc -l`
 	PrintMsg blue "OK"
         PrintMsg normal "\tFound: $KickSFiles x ACR host."
     fi
@@ -409,7 +419,7 @@ function Stage__Kickstarts {
     PrintMsg blue "..."
     PrintMsg normal "\n"
 
-    for Host in `ls -1 ${MyDir}/${Prefix}*`
+    for Host in `ls -1 ${MyDir}/Host_Config*`
     do
         PrintMsg normal "\t`echo $Host | sed -e 's/\.\///g'`\t"
         
@@ -608,29 +618,28 @@ function Stage__ISOLUNUX {
     PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "RHEL Menu\n"
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
-    echo DEBUG exit ; exit 1 ######################################################################
-
     # HostCust
 
     PrintMsg normal "\nCheck isolinux template\t"
 
       TemplateISODefault=$MyDir"/template/isolinux-default.template"
-      TemplateISOaSingle=$MyDir"/template/isolinux-single.template"
+      TemplateISOSingle=$MyDir"/template/isolinux-single.template"
       TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
 
     PrintMsg normal "\nCheck iso ks-path\t"
-    [ -d ${WorkRHEL}${IsoKSPath} ] || mkdir -p ${WorkRHEL}${IsoKSPath} 
-    if [ -d ${WorkRHEL}${IsoKSPath} ]
+    [ -d ${WorkRHEL}/${IsoKSPath} ] || mkdir -p ${WorkRHEL}/${IsoKSPath} 
+    if [ -d ${WorkRHEL}/${IsoKSPath} ]
     then
-	IsoKsDest=${WorkRHEL}${IsoKSPath}
+	IsoKsDest=${WorkRHEL}/${IsoKSPath}
         PrintMsg blue "OK"
-        PrintMsg normal "\tFound: ${WorkRHEL}${IsoKSPath}"
+        PrintMsg normal "\tFound: ${WorkRHEL}/${IsoKSPath}"
     else
         PrintMsg red "FAIL"
-        PrintMsg normal "\tNot found: ${WorkRHEL}${IsoKSPath}"
+        PrintMsg normal "\tNot found: ${WorkRHEL}/${IsoKSPath}"
 	return $STG
     fi
 
+    PrintMsg normal "\nCheck menu templates\t"
     if [ -f $TemplateISODefault ] && [ -f $TemplateISOaSingle ] && [ -f $TemplateISOtoFinal ]
     then
         PrintMsg blue "OK"
@@ -643,80 +652,69 @@ function Stage__ISOLUNUX {
 
     PrintMsg normal "\nCollect variales\t"
 
-      CheckLEN $HostCust   || exit 1
-      IsoHostTitle=$HostCust__`date +%F`         # isolinux-default.template  ___Title___ 
+      CheckLEN $HostCust   || exit 1A
+      Date=`date +%F`
+      Text="acr-build"
+      IsoHostTitle="ACR-build__"$HostCust"__"$Date
 
       CheckLEN $IsoLabel   || exit 2
       IsoHdLabel=$IsoLabel                       # isolinux-default.template  ___HdLabel___           # IsoLabel
 
-      IsoSubMenu="ACR-BUILD" 
-      CheckLEN $IsoSubMenu || exit 3                    # isolinux-default.template  ___SubMenu___           # HostCust
-
+      # IsoSubMenu=$HostCust"\ kickstart\ ACR"
+      IsoSubMenu="ACR_Kickstart"
+      CheckLEN $IsoSubMenu || exit 3             # isolinux-default.template  ___SubMenu___           # HostCust
     PrintMsg blue "OK"
-    PrintMsg normal "\t"
+    PrintMsg normal "\n"
 
 
-    PrintMsg normal "\nInitiate isolinux\t"
 
-      if [ -f $WorkRHEL/isolinux/isolinux.cfg ]
-      then
-
-          cp $WorkRHEL/isolinux/isolinux.cfg $WorkRHEL/isolinux/.isolinux.cfg_`date +%F`_$$ 
-          cat $TemplateISODefault > $WorkRHEL/isolinux/isolinux.cfg
-          PrintMsg blue "OK" 
-
-	  [ $? -ne 0 ] && PrintMsg red "FAIL" && return 87
-
-      else
-
-          PrintMsg red "FAIL"
-	  return 87
-      fi
-
-    PrintMsg normal "\nMain isolinux bits\t"
-
-      #
-      #
-      #
-      # isolinux-default.template  ___Title___
-      # isolinux-default.template  ___HdLabel___
-      # isolinux-default.template  ___SubMenu___
-
-    PrintMsg normal "\nEack kickstart\t"
+    PrintMsg normal "\nPer kickstart\t"
     if [ `ls -1 $WorkAcrKickstart/ks__*.cfg | wc -l` -gt 1 ]
     then
         PrintMsg normal "\nIndividual Host Files\t"
         PrintMsg blue "..."
 
+	TemplateTMPISOCombo="/tmp/.isolinux_Combo_"`date +%F`"_"$$".tmp"
+
 	cd $WorkAcrKickstart/
         for AcrKsFile in `ls -1 ks__*.cfg`
 	do
             PrintMsg normal "\n\t$AcrKsFile\t" 
-	    IsoSingleLable=`echo $AcrKsFile | sed -e 's/\.cfg//g' | cut -c 4-999` # isolinux-single.template   ___SingleLabel___       # File ?
-	    IsoSingleMenuText=$IsoSingleLable # isolinux-single.template   ___SingleMenuText___    # FQDN ?
-	    IsoSingleMenuHelpText="install_It_Now" # isolinux-single.template   ___SingleHelpText___    # IP ?
-	    IsoSingleMenuHdLabel=$IsoHdLabel # isolinux-single.template   ___HdLabel___           # IsoLabel
-	    IsoSingleFullPathKsFile=$IsoKSPath"/"$AcrKsFile    # ="/kickstart" # isolinux-single.template   ___FullPathToKsCfg___   # /kickstart/
-
-	    cp -f $AcrKsFile $IsoKsDest/. || exit 77
 
 	    TestSingle=0
-            cat $TemplateISOaSingle > /tmp/.isolinux_$IsoSingleLable_$$.tmp || TestSingle=1
 
-            #
-            #
-            #
-            # isolinux-single.template   ___SingleLabel___
-            # isolinux-single.template   ___SingleMenuText___
-            # isolinux-single.template   ___SingleHelpText___
-            # isolinux-single.template   ___HdLabel___
-            # isolinux-single.template   ___FullPathToKsCfg___
-             
+            #   IsoSingleLable  == { ___SingleLabel___ }  @  [ isolinux-single.template ]
+	    #     #    Explain "sed" :      | change "." to "_"  | double "_" to one | rem leading "_"  | rem trailing "_" | rem leadingi  "ks_"
+	    IsoSingleLable=`echo $AcrKsFile | cut -f1 -d \.  | sed -e 's/__/_/g' | sed -e 's/^_//g' | sed -e 's/_$//g' | sed -e 's/^ks_//g'` 
+
+	    IsoSingleMenuText=$IsoSingleLable # isolinux-single.template   ___SingleMenuText___    # FQDN ?
+	    IsoSingleMenuHelpText="IpAddr__"`grep -v ^# $AcrKsFile | grep "ip=" | sed -e 's/\ /\n/g' | grep "ip=" | cut -f2 -d \= | sed -e 's/\./_/g'`
+	    IsoSingleMenuHdLabel=$IsoHdLabel # isolinux-single.template   ___HdLabel___           # IsoLabel
+	    IsoSingleFullPathKsFile=`echo '\\/'$IsoKSPath'\\/'$AcrKsFile`    # ="/kickstart" # isolinux-single.template   ___FullPathToKsCfg___   # /kickstart/
+	    IsoSingleHelpText="Install Now"
+	    TemplateTMPISOSingle="/tmp/.isolinux_Sngle_"$IsoSingleLable"_"`date +%F`"_"$$".tmp"
+            cat $TemplateISOSingle > $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
+	    cp -f $AcrKsFile $IsoKsDest/$AcrKsFile          || let TestSingle=$TestSingle+1
+
+	          #   ___FullPathToKsCfg___  $IsoSingleFullPathKsFile     isolinux-single.template 
+            sed -i 's/___FullPathToKsCfg___/'$IsoSingleFullPathKsFile'/g' $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
+
+       	    #   ___SingleLabel___  $IsoSingleLable                  isolinux-single.template 
+            [ $DEBUG = "true" ]  && let DEBCNT=$DEBCNT+1 && DT="IsoSingleLable"  &&  DV=$IsoSingleLable  &&  printf "\ntDEBUG\t[ Nme: $DT ]\t[ Val: $DV ]\t{ Er: $? }\t( Nr: $DEBCNT )\n"
+            sed -i 's/___SingleLabel___/'$IsoSingleLable'/g'              $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
+
+
+            [ $DEBUG = "true" ]  && let DEBCNT=$DEBCNT+1 && DT="IsoSingleMenuHelpText"  &&  DV=$IsoSingleMenuHelpText &&  printf "\ntDEBUG\t[ Nme: $DT ]\t[ Val: $DV ]\t{ Er: $? }\t( Nr: $DEBCNT )\n"
+            sed -i 's/___SingleHelpText___/'$IsoSingleMenuHelpText'/g'              $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
+
+            #   ___SingleMenuText___  $IsoSingleMenuText            isolinux-single.template 
+            [ $DEBUG = "true" ]  && let DEBCNT=$DEBCNT+1 && DT="IsoSingleMenuText"  &&  DV=${IsoSingleMenuText}  &&  printf "\n\tDEBUG\t[ Nme: $DT ]\t[ Val: $DV ]\t{ Er: $? }\t( Nr: $DEBCNT )\n"
+            sed -i 's/___SingleMenuText___/'$IsoSingleMenuText'/g'        $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
+
+            [ $DEBUG = "true" ]  && let DEBCNT=$DEBCNT+1 && DT="TestSingle"  &&  DV=${TestSingle}  &&  printf "\n\tDEBUG\t[ Nme: $DT ]\t[ Val: $DV ]\t{ Er: $? }\t( Nr: $DEBCNT )\n"
 	    if [ $TestSingle -eq 0 ]
             then
-                cat /tmp/.isolinux_$IsoSingleLable_$$.tmp >> ${WorkRHEL}"/isolinux/isolinux.cfg" \
-                  && mv /tmp/.isolinux_$IsoSingleLable_$$.tmp /tmp/.isolinux_$IsoSingleLable_$$.done 
-
+	        cat $TemplateTMPISOSingle >> $TemplateTMPISOCombo && rm -f $TemplateTMPISOSingle 
                 PrintMsg blue "OK"
                 PrintMsg normal "\t"
             else
@@ -729,6 +727,61 @@ function Stage__ISOLUNUX {
     fi
 
     # TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
+
+    PrintMsg normal "\nInitiate isolinux\t"
+
+      if [ -f $WorkRHEL/isolinux/isolinux.cfg ]
+      then
+          cp $WorkRHEL/isolinux/isolinux.cfg $WorkRHEL/isolinux/.isolinux.cfg_`date +%F`_$$ 
+	  TemplateTMPISODefault="/tmp/.isolinux_"`date +%F`"_"$$".tmp"
+          # cat $TemplateISODefault > $WorkRHEL/isolinux/isolinux.cfg
+
+          cat $TemplateISODefault > $TemplateTMPISODefault \
+		  && cat $TemplateTMPISOCombo >> $TemplateTMPISODefault \
+		  && rm -f $TemplateTMPISOCombo \
+		  && cat $TemplateISOtoFinal >> $TemplateTMPISODefault
+
+	  [ $? -ne 0 ] && PrintMsg red "FAIL" && return 87
+          PrintMsg blue "OK" 
+      else
+          PrintMsg red "FAIL"
+	  return 87
+      fi
+
+    PrintMsg normal "\nMain isolinux bits\n"
+
+      echo sed -i 's/___HdLabel___/'$IsoLabel'/g'   $TemplateTMPISODefault
+      sed -i 's/___HdLabel___/'$IsoLabel'/g'   $TemplateTMPISODefault
+      echo $? ; echo
+
+      echo sed -i 's/___Title___/'$IsoHostTitle'/g' $TemplateTMPISODefault
+      sed -i 's/___Title___/'$IsoHostTitle'/g'   $TemplateTMPISODefault
+      echo $? ; echo
+
+      echo sed -i 's/___SubMenu___/'$IsoSubMenu'/g' $TemplateTMPISODefault
+      sed -i 's/___SubMenu___/'$IsoSubMenu'/g'   $TemplateTMPISODefault
+      echo $? ; echo
+
+    PrintMsg normal "\n"
+    PrintMsg blue "==========================================================================" ; PrintMsg normal "\n"
+    cat $TemplateTMPISODefault 
+    PrintMsg blue "==========================================================================" ; PrintMsg normal "\n"
+    if [ `grep "___"  $TemplateTMPISODefault | wc -l` -gt 0 ]
+    then
+	    PrintMsg red "\nISSUES" ; PrintMsg normal "\n"
+            grep "___"  $TemplateTMPISODefault
+	    PrintMsg red "\nexit now." ; PrintMsg normal "\n"
+	    exit 1
+    fi
+    PrintMsg yellow "\nAccept ? [y/n] "
+    # read ConfIso
+    ConfIso="y"
+    PrintMsg normal "\n\tAssume \"y\"\n" ; sleep 3
+    [ $ConfIso = "y" ] || exit 22
+
+    cp -v ${WorkRHEL}/isolinux/isolinux.cfg /tmp/.isolinix.cfg.orig_`date +%F`_$$ \
+	    && cat $TemplateTMPISODefault > ${WorkRHEL}/isolinux/isolinux.cfg
+    [ $? -ne 0 ] && exit 1
 
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
     PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
@@ -767,6 +820,55 @@ function Stage__Combiner {
     PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Combiner\n"
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
+    CurDir=`pwd -P`
+    IsoDirSoftware="acr"
+    IsoArchSoftware="softfare.tgz"
+
+    PrintMsg normal "\nPrepare dir ISO/$IsoDirSoftware\t"
+
+    [ -d ${WorkRHEL}/${IsoDirSoftware} ] && rm -rf ${WorkRHEL}/${IsoDirSoftware} &>/dev/null
+
+    mkdir ${WorkRHEL}/${IsoDirSoftware} &>/dev/null
+    if [ $? -eq 0 ]
+    then
+          PrintMsg blue "OK" 
+    else
+          PrintMsg red "FAIL"
+	  return 87
+    fi
+
+    PrintMsg normal "\nACR ISO ccompress\t"
+
+   cd $WorkAcrSw
+   if [ $? -eq 0 ]
+   then
+       ArchGood="1" # assume no
+       {
+           /bin/tar -cvzf $WorkRHEL/$IsoDirSoftware/$IsoArchSoftware * && ArchGood="0"
+
+       }&>$WorkRHEL/$IsoDirSoftware/$IsoArchSoftware.`date +%F`.txt
+       if [ $ArchGood -eq 0 ]
+       then
+           cd $WorkRHEL/$IsoDirSoftware/  &&  sha1sum $IsoArchSoftware > $IsoArchSoftware".sha1sum.txt" 
+
+       	   if [ $? -eq 0 ]
+           then
+               PrintMsg blue "OK" 
+           else
+               PrintMsg red "FAIL"
+	       return 87
+           fi
+       else 
+           PrintMsg red "FAIL"
+	   return 89
+       fi
+   else
+        PrintMsg red "FAIL"
+	return 88
+   fi
+   cd $CurrDir
+
+    PrintMsg normal "\n"
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
     PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
     return 0
@@ -778,6 +880,23 @@ function Stage__GenISOImage {
 
     PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Gen-ISO\n"
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    
+    PrintMsg normal "\nGenerate ISO\t"
+
+    cd $WorkRHEL
+
+    genisoimage -o $WorkMain/$IsoLabel.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot \
+	        -V $IsoLabel -boot-load-size 4 -boot-info-table -R -J -v -T ./ 
+
+    if [ $? -eq 0 ]
+    then
+          PrintMsg blue "OK" 
+    else
+          PrintMsg red "FAIL"
+	  return 87
+    fi
+
+    PrintMsg normal "\n"
 
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
     PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
@@ -787,7 +906,9 @@ function Stage__GenISOImage {
 function Stage__Cleanup {
 
     StgNum=$1
-
+    PrintMsg yellow "\n\nISO\t$WorkMain/$IsoLabel.iso\n"
+    PrintMsg normal "\nDONE\n\n"
+    exit 0
     PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Cleanup\n"
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
@@ -851,10 +972,11 @@ if [ $StageLast = $StageCurrent ] 2>/dev/null
 then
     StageCurrent="S00"
 else
-	Question "Resume after last completed stage? $StageLast"
+	echo Question "Resume after last completed stage? $StageLast"
 	if [ $? -eq 0 ] 2>/dev/null
 	then
             StageCurrent=`echo $StageLast | sed -e 's/S//g'`
+            StageCurrent="04"
         else
             StageCurrent="00"
 	fi
@@ -866,13 +988,13 @@ fi
 
 while [ $StageCurrent <> $StageLast ]
 do
-    for STG in `seq -w $StageCurrent 1 11`
+    # for STG in `seq -w $StageCurrent 1 11`
+    Sequence="04 05 08 09 11" 
+    for STG in $Sequence
     do
 
-    [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "DEBUG\tEnter while $StageCurrent not $StageLast\n"
-
-    PrintMsg normal "\n"
-    PrintMsg red "================================================================="
+    # PrintMsg blue "\n================================================================="
+    PrintMsg blue " \n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
     PrintMsg normal "\n"
 
 
@@ -971,7 +1093,8 @@ exit 0
 # cat $Working/custom/.end.template >> $Working/custom/isolinux/isolinux.cfg
 # [ -e $Working/acr.iso ] && cd $Working/acr.iso && tar -cvzf $Working/target/ACR.tgz *
 # [ -e $Working/CUSTOM-RHEL.iso ] && rm -v $Working/completed.iso 
-# cd $Working/target && genisoimage -o $Working/CUSTOM-RHEL.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -V CUSTOM-RHEL -boot-load-size 4 -boot-info-table -R -J -v -T ./ \
+# cd $Working/target &&
+#       	genisoimage -o $Working/CUSTOM-RHEL.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -V CUSTOM-RHEL -boot-load-size 4 -boot-info-table -R -J -v -T ./ \
 # 	&& echo done
 # 
 # timezone ___TIMEZONE___ --utc --ntpservers=192.168.0.1
@@ -981,3 +1104,4 @@ exit 0
 # ___PARTLINE_PGSQL___
 # ___PARTLINE_SWAP___
 # ___PARTLINE_CALLS___
+# for JJ in `find  /root/Desktop/acr-build-ISO-WorkMain/workACR-kickstart /root/Desktop/acr-build-ISO-WorkMain/ -mindepth 1 -maxdepth 1 -type d `; do echo $JJ; rm -rf $JJ ; mkdir -v $JJ;done
