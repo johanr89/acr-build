@@ -1,5 +1,11 @@
+#
+## acr-build - isolinux-final.template ## SRT
+#
 menu separator # insert an empty line
 label returntomain
-  menu label Return to ^main menu
+  menu label Return to main menu
   menu exit
 menu end
+#
+## acr-build - isolinux-final.template ## EOF
+#

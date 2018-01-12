@@ -1,7 +1,7 @@
 install
 cdrom
 text
-reboot
+# reboot
 lang en_US.UTF-8
 keyboard --vckeymap=___KEYBOARD___ --xlayouts=___KEYBOARD___
 #

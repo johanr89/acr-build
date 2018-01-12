@@ -295,9 +295,9 @@ function Stage__CopyIso {
     PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Copy ISO\n"
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
-    PrintMsg normal "\nRun copy RHEL now\t"
+    PrintMsg normal "\nRun copy RHEL \t"
     SizeRhelWork=`du -sk $WorkRHEL | awk '{print $1}'`
-    if [ $SizeRhelWork -gt 3600000 ] # Usually 4054996
+    if [ $SizeRhelWork -gt 2600000 ] # Usually 4054996
     then		
 	PrintMsg blue "OK"
         PrintMsg normal "\tPreviously copied, or clean before this ... dir:`du -sh $WorkRHEL/.`"
@@ -306,12 +306,11 @@ function Stage__CopyIso {
         mountpoint -q $Rhl_Mnt
         if [ $? -eq 0 ] && [ -d $WorkRHEL ]
         then
-            PrintMsg blue "busy ... "
-            {
-        	    rsync --update -avz $Rhl_Mnt/* $WorkRHEL/.
-            }&>/dev/null
+            PrintMsg blue "...\n"
+            rsync --progress --update -az $Rhl_Mnt/* $WorkRHEL/.
     	if [ $? -eq 0 ]
             then
+            PrintMsg normal "\n ... copy RHEL ...\t"
 	        PrintMsg blue "OK"
                 PrintMsg normal "\tDone  iso:`du -sh $Rhl_Mnt/.` Dir:`du -sh $WorkRHEL/.`"
 	        umount $Rhl_Mnt
@@ -326,6 +325,13 @@ function Stage__CopyIso {
             return 32
         fi
     fi
+
+    PrintMsg normal "\nSlimming - del KDE \t"
+    SizeBefore=`du -sh $WorkRHEL/. | awk '{print $1}'`
+    find $WorkRHEL/Packages/ -iname "*kde*.rpm" --exec rm -f '{}' \; 2>/dev/null
+    SizeAfter=`du -sh $WorkRHEL/. | awk '{print $1}'`
+    PrintMsg blue "OK"
+    PrintMsg normal "\tDone:   Was [ $SizeBefore ]   Now [ $SizeAfter ]"
 
     PrintMsg normal "\n"
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
@@ -898,6 +904,36 @@ function ErrorStatus {
         fi
 	echo " OOPSIE "; exit 999
 }
+function CleanDirs {
+
+	PrintMsg blue "\n\nClean Directories:\n"
+	PrintMsg normal "\n"
+
+	AllClean="no"
+
+        for DirToClean in `find  /root/Desktop/acr-build-ISO-WorkMain/workACR-kickstart /root/Desktop/acr-build-ISO-WorkMain/ -mindepth 1 -maxdepth 1 -type d `
+    do
+	    if [ $AllClean = "no" ]
+	    then
+	            echo
+		    echo "Clean "$DirToClean" ? (y)es, (n)o, (a)all ? "
+         	    read CleanAnswer
+	            echo
+
+	            [ $CleanAnswer = "a" ] 2>/dev/null && AllClean="yes"
+	    fi
+
+	    if [ $AllClean = "yes" ] || [ $CleanAnswer = "y" ] 2>/dev/null
+	    then
+		    rm -rf $DirToClean &>/dev/null
+		    mkdir $DirToClean
+		    echo "Cleaned : "$DirToClean
+	    else
+		    echo ; echo "No Action" ; echo
+	    fi
+    done
+    return 0
+}
 
 function Question () {
 
@@ -935,11 +971,15 @@ function Question () {
 	     if [ `echo $Option | egrep -i '(r|e|c|s|n)' | wc -l` -gt 0 ] 2>/dev/null
 	     then
                  ValidResponse=0
+
 		 [ `echo $Option | grep -i "r" | wc -l` -gt 0 ] && return 0
-#		 [ `echo $Option | grep -i "c" | wc -l` -gt 0 ] && echo "C"
+
+		 [ `echo $Option | grep -i "e" | wc -l` -gt 0 ] && exit 0
+
+	         [ `echo $Option | grep -i "c" | wc -l` -gt 0 ] && CleanDirs && let ValidResponse=$ValidResponse+1
+
+		 [ `echo $Option | grep -i "s" | wc -l` -gt 0 ] && echo && echo "Enter stage:" && read StaNum && return $StaNum
 #		 [ `echo $Option | grep -i "n" | wc -l` -gt 0 ] && echo "N"
-#		 [ `echo $Option | grep -i "s" | wc -l` -gt 0 ] && echo "S"
-		 return 99
 	     else
                  let ValidResponse=$ValidResponse+1
 	         PrintMsg red "\nER:\t$Option"
@@ -1133,5 +1173,4 @@ exit 0
 # ___PARTLINE_PGSQL___
 # ___PARTLINE_SWAP___
 # ___PARTLINE_CALLS___
-# for JJ in `find  /root/Desktop/acr-build-ISO-WorkMain/workACR-kickstart /root/Desktop/acr-build-ISO-WorkMain/ -mindepth 1 -maxdepth 1 -type d `; do echo $JJ; rm -rf $JJ ; mkdir -v $JJ;done
 #wget http://github.com/johanr89/acr-tools/archive/master.zip
