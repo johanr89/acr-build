@@ -11,7 +11,7 @@ ColDBG="normal"
 StageTrackPrefix="/tmp/.build_iso_stage_tracker"
 StageTrackFile=$StageTrackPrefix"_"$$".tmp"
 
-KsCreator="create-an-ACR.sh"
+KsCreator="add-ACR_kickstart.sh"
 DefaultsFile="create-an-ACR.variables.cfg"
 Prefix=`grep -i ^prefix $KsCreator | cut -f2 -d\"` 
 TimeOUT="1"
@@ -341,24 +341,31 @@ function Stage__CopyACR {
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
     PrintMsg normal "\nRun copy ACR now\t"
-    SizeAcrWork=`du -sk $WorkAcrSW | awk '{print $1}'`
-    if [ $SizeAcrWork -gt 140000 ] # Usually 166230
+    Got_ACR=`find $WorkAcrSw/. -type f -iname "*.rpm" | grep -i \/acr | wc -l`
+    Got_Postgres=`find $WorkAcrSw/. -type f -iname "*.r" | grep -i \/postgres | wc -l`
+    Got_Tomcat=`find $WorkAcrSw/. -type f -iname "*.r" | grep -i \/tomcat | wc -l`
+    Got_Java=`find $WorkAcrSw/. -type f -iname "*.r" | grep -i \/jdk | wc -l`
+    Got_Html=`find $WorkAcrSw/. -type f -iname "*.htm*" | wc -l`
+
+    if [ $Got_ACR -ge 1 ] &&  [ $Got_Postgres -ge 1 ] && [ $Got_Tomcat -ge 1 ] && [ $Got_Java -ge 1 ] && [ $Got_Html -ge 1 ]
     then
 	PrintMsg blue "OK"
-        PrintMsg normal "\tPreviously copied, or clean before this ... dir:`du -sh $WorkAcrSw/.`"
+        PrintMsg normal "\tFound all required installers."
         umount $ACR_Mnt
     else
         mountpoint -q $ACR_Mnt
         if [ $? -eq 0 ] && [ -d $WorkAcrSw ]
         then
-            PrintMsg blue "busy ... "
-            {
-                rsync --update -avz $ACR_Mnt/* $WorkAcrSw/.
-            }&>/dev/null
-            if [ $? -eq 0 ]
+            VeryfyCopy=0
+            find  $ACR_Mnt -type f -iname "*.jar"  -exec cp '{}' $WorkAcrSw/. \; || let VeryfyCopy=$VeryfyCopy+1
+            find  $ACR_Mnt -type f -iname "*.rpm"  -exec cp '{}' $WorkAcrSw/. \; || let VeryfyCopy=$VeryfyCopy+1
+            find  $ACR_Mnt -type f -iname "*.run"  -exec cp '{}' $WorkAcrSw/. \; || let VeryfyCopy=$VeryfyCopy+1
+            find  $ACR_Mnt -type f -iname "*.html" -exec cp '{}' $WorkAcrSw/. \; || let VeryfyCopy=$VeryfyCopy+1
+
+	    if [ $VeryfyCopy -eq 0 ]
             then
 	        PrintMsg blue "OK"
-                PrintMsg normal "\tDone  iso:`du -sh $ACR_Mnt/.` Dir:`du -sh $WorkAcrSw/.`"
+                PrintMsg normal "\tCopied all required installers."
 	        umount $ACR_Mnt
             else
                 PrintMsg red "FAIL"
@@ -578,36 +585,6 @@ function Stage__Kickstarts {
     return 0
 
 # CRS_Layout
-# ACR_SW_TGZ
-# ACR_Patch_Dir
-# ACR_TOOLS
-
-######  kickstart-acr.template
-#
-#  # JLR ___ clearpart --all --initlabel
-#  ___CLEARPARTLINE___
-#  # JLR-default ___ part /boot --fstype=ext4 --size=200
-#  # JLR-custom  ___ part /boot        --fstype=ext4  --usepart=sda1
-#  ___PARTLINE_BOOT___
-#  # JLR-default ___ part / --fstype=ext4 --size=10000
-#  # JLR-custom  ___ part /            --fstype=ext4  --usepart=sda2
-#  ___PARTLINE_ROOT___
-#  # JLR-default ___ part /opt/witness --fstype=ext4 --size=10000
-#  # JLR-custom  ___ part /opt/witness  --fstype=ext4 --usepart=sda3
-#  ___PARTLINE_WITNESS___
-#  # JLR-default ___ part /var/lib/pgsql --fstype=ext4 --size=10000
-#  # JLR-custom  ___ part /var/lib/pgsql --fstype=ext4 --usepart=sda4
-#  ___PARTLINE_PGSQL___
-#  # JLR-default ___ part  swap --recommended
-#  # JLR-custom  ___ part  swap  --usepart=sdb1 --ondisk=sdb 
-#  ___PARTLINE_SWAP___
-#  # JLR-default ___ part /calls --fstype=ext4 --size=1000 --grow
-#  # JLR-custom  ___ part /calls --usepart=sdb2 --ondisk=sdb --noformat 
-#  ___PARTLINE_CALLS___
-#  
-#  
-
-#WorkAcrPatch=$WorkMain"/workACR-patch"
 
 }
 
@@ -655,7 +632,7 @@ function Stage__ISOLUNUX {
       CheckLEN $HostCust   || exit 1A
       Date=`date +%F`
       Text="acr-build"
-      IsoHostTitle="ACR-build__"$HostCust"__"$Date
+      IsoHostTitle=`echo $HostCust | sed -e 's/\ /_/g' | sed -e 's/\./_/g'`
 
       CheckLEN $IsoLabel   || exit 2
       IsoHdLabel=$IsoLabel                       # isolinux-default.template  ___HdLabel___           # IsoLabel
@@ -750,17 +727,10 @@ function Stage__ISOLUNUX {
 
     PrintMsg normal "\nMain isolinux bits\n"
 
-      echo sed -i 's/___HdLabel___/'$IsoLabel'/g'   $TemplateTMPISODefault
       sed -i 's/___HdLabel___/'$IsoLabel'/g'   $TemplateTMPISODefault
-      echo $? ; echo
-
-      echo sed -i 's/___Title___/'$IsoHostTitle'/g' $TemplateTMPISODefault
       sed -i 's/___Title___/'$IsoHostTitle'/g'   $TemplateTMPISODefault
-      echo $? ; echo
-
-      echo sed -i 's/___SubMenu___/'$IsoSubMenu'/g' $TemplateTMPISODefault
-      sed -i 's/___SubMenu___/'$IsoSubMenu'/g'   $TemplateTMPISODefault
-      echo $? ; echo
+      sed -i 's/___SubMenu___/'$IsoHostTitle'/g'   $TemplateTMPISODefault
+      sed -i 's/___Date___/'$Date'/g'   $TemplateTMPISODefault
 
     PrintMsg normal "\n"
     PrintMsg blue "==========================================================================" ; PrintMsg normal "\n"
@@ -796,6 +766,8 @@ function Stage__ACRPatches {
     PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Patch Collection\n"
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
+# ACR_Patch_Dir
+
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
     PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
     return 0
@@ -807,6 +779,8 @@ function Stage__ACRTools {
 
     PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "acr-tools\n"
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+
+# ACR_TOOLS
 
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
     PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
@@ -821,35 +795,21 @@ function Stage__Combiner {
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
     CurDir=`pwd -P`
-    IsoDirSoftware="acr"
-    IsoArchSoftware="softfare.tgz"
+    IsoArchSoftware="acr-softfare.tgz"
 
     PrintMsg normal "\nPrepare dir ISO/$IsoDirSoftware\t"
-
-    [ -d ${WorkRHEL}/${IsoDirSoftware} ] && rm -rf ${WorkRHEL}/${IsoDirSoftware} &>/dev/null
-
-    mkdir ${WorkRHEL}/${IsoDirSoftware} &>/dev/null
-    if [ $? -eq 0 ]
-    then
-          PrintMsg blue "OK" 
-    else
-          PrintMsg red "FAIL"
-	  return 87
-    fi
-
-    PrintMsg normal "\nACR ISO ccompress\t"
 
    cd $WorkAcrSw
    if [ $? -eq 0 ]
    then
        ArchGood="1" # assume no
        {
-           /bin/tar -cvzf $WorkRHEL/$IsoDirSoftware/$IsoArchSoftware * && ArchGood="0"
+           /bin/tar -cvzf $WorkRHEL/$IsoArchSoftware * && ArchGood="0"
 
-       }&>$WorkRHEL/$IsoDirSoftware/$IsoArchSoftware.`date +%F`.txt
+       }&>$WorkRHEL/$IsoArchSoftware.`date +%F`.txt
        if [ $ArchGood -eq 0 ]
        then
-           cd $WorkRHEL/$IsoDirSoftware/  &&  sha1sum $IsoArchSoftware > $IsoArchSoftware".sha1sum.txt" 
+           cd $WorkRHEL/  &&  sha1sum $IsoArchSoftware > $IsoArchSoftware".sha1sum.txt" 
 
        	   if [ $? -eq 0 ]
            then
@@ -884,6 +844,14 @@ function Stage__GenISOImage {
     PrintMsg normal "\nGenerate ISO\t"
 
     cd $WorkRHEL
+
+    PrintMsg yellow "\nGenerate ISO  ? [y/n] " 
+    read ConfGen # 
+    PrintMsg normal "\n"
+    ConfGen="y" ; PrintMsg normal " ... assume \"yes\"\n" ; sleep 3
+    [ $ConfGen = "y" ] || exit 22
+
+    [ -f $WorkMain/$IsoLabel.iso ] && rm -f $WorkMain/$IsoLabel.iso &>/dev/null
 
     genisoimage -o $WorkMain/$IsoLabel.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot \
 	        -V $IsoLabel -boot-load-size 4 -boot-info-table -R -J -v -T ./ 
@@ -931,26 +899,70 @@ function ErrorStatus {
 	echo " OOPSIE "; exit 999
 }
 
-function Question {
+function Question () {
 
-	QQQ=$1
-	PrintMsg yellow "\nQ:\t"
-	PrintMsg normal "$QQQ"
-	PrintMsg yellow " ?"
-	PrintMsg normal "\t["   ; PrintMsg yellow "Y"
-	PrintMsg normal "] YES  or  [" ; PrintMsg yellow "N" ; PrintMsg normal "] NO "
-	read Answer ; PrintMsg normal "\n"
+    ValidResponse=1
 
-        if [ `echo $Answer | grep -i "y" | wc -l` -ge 1 ] 2>/dev/null
-	then
-            return 0
-        elif [ `echo $Answer | grep -i "n" | wc -l` -ge 1 ] 2>/dev/null
-	then
-            return 1
-        else
-            return 3
+    while [ $ValidResponse -gt 0 ]
+    do
+	PrintMsg yellow "\n$0 Options:\n"
+	PrintMsg normal "\n\t["
+	PrintMsg yellow " R "
+	PrintMsg normal "] run"
+
+	PrintMsg normal "\n\t["
+	PrintMsg yellow " E "
+	PrintMsg normal "] exit"
+
+	PrintMsg normal "\n\t["
+	PrintMsg yellow " C " 
+	PrintMsg normal "] clean working dir"
+
+	PrintMsg normal "\n\t["
+	PrintMsg yellow " S "
+	PrintMsg normal "] specify stage"
+
+	PrintMsg normal "\n\t["
+	PrintMsg yellow " N "
+	PrintMsg normal "] next incomplete stage" 
+
+	PrintMsg yellow "\n\n\t? "
+	unset $Option
+	read Option
+        [ `echo $Option | wc -c` -ne 2 ] && Option=r
+	if [ `echo $Option | wc -c` -eq 2 ] 2>/dev/null
+	then 
+	     if [ `echo $Option | egrep -i '(r|e|c|s|n)' | wc -l` -gt 0 ] 2>/dev/null
+	     then
+                 ValidResponse=0
+		 [ `echo $Option | grep -i "r" | wc -l` -gt 0 ] && return 0
+#		 [ `echo $Option | grep -i "c" | wc -l` -gt 0 ] && echo "C"
+#		 [ `echo $Option | grep -i "n" | wc -l` -gt 0 ] && echo "N"
+#		 [ `echo $Option | grep -i "s" | wc -l` -gt 0 ] && echo "S"
+		 return 99
+	     else
+                 let ValidResponse=$ValidResponse+1
+	         PrintMsg red "\nER:\t$Option"
+	         PrintMsg normal "\n"
+	     fi
         fi
+    done
+
 }
+
+#	PrintMsg normal "] YES  or  [" ; PrintMsg yellow "N" ; PrintMsg normal "] NO "
+#	read Answer ; PrintMsg normal "\n"
+#
+#        if [ `echo $Answer | grep -i "y" | wc -l` -ge 1 ] 2>/dev/null
+#	then
+#            return 0
+#        elif [ `echo $Answer | grep -i "n" | wc -l` -ge 1 ] 2>/dev/null
+#	then
+#            return 1
+#        else
+#            return 3
+#        fi
+# for JJ in `find  /root/Desktop/acr-build-ISO-WorkMain/workACR-kickstart /root/Desktop/acr-build-ISO-WorkMain/ -mindepth 1 -maxdepth 1 -type d `; do echo $JJ; rm -rf $JJ ; mkdir -v $JJ;done
 
 ############################################################
 
@@ -960,36 +972,52 @@ function Question {
 #  |/|            |/|
 #  |////////////////|
 
+
 DEBUG=false
-#DEBUG=true
+#DEBUG="true"
 
-StageCurrent="S00"
-StageLast="S11"
+Question
+Start=$?
 
-#StageLast=`StageProcess_GetLastEnd` 2>/dev/null || StageLast="S00" ; [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "\nDEBUG\tStageLast returned as $StageLast\n" 
-
-if [ $StageLast = $StageCurrent ] 2>/dev/null
+if [ $Start -lt 10 ]
 then
-    StageCurrent="S00"
+    Now=`echo "0"$Start`
+    Sequence=`seq -w $Now 1 11`
+elif [ $Start -ge 10 ]
+then 
+    Sequence=`seq -w $Start 1 11`
 else
-	echo Question "Resume after last completed stage? $StageLast"
-	if [ $? -eq 0 ] 2>/dev/null
-	then
-            StageCurrent=`echo $StageLast | sed -e 's/S//g'`
-            StageCurrent="04"
-        else
-            StageCurrent="00"
-	fi
-	PrintMsg normal "\n"
-        rm -f /tmp/.build_iso_stage_tracker_*.tmp 2>/dev/null
-        echo $StageCurrent":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+	echo "fukup "$Response" "$Sequence
+	exit
 fi
 
 
-while [ $StageCurrent <> $StageLast ]
-do
+#StageCurrent="S00"
+#StageLast="S11"
+
+#StageLast=`StageProcess_GetLastEnd` 2>/dev/null || StageLast="S00" ; [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "\nDEBUG\tStageLast returned as $StageLast\n" 
+
+#if [ $StageLast = $StageCurrent ] 2>/dev/null
+#then
+#    StageCurrent="S00"
+#else
+#	Response=`Question`
+#	if [ $? -eq 0 ] 2>/dev/null
+#	then
+#            StageCurrent=`echo $StageLast | sed -e 's/S//g'`
+#            StageCurrent="04"
+#        else
+#            StageCurrent="00"
+#	fi
+#	PrintMsg normal "\n"
+#        rm -f /tmp/.build_iso_stage_tracker_*.tmp 2>/dev/null
+#        echo $StageCurrent":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+#fi
+
+
+#while [ $StageCurrent -lt 11 ]
+#do
     # for STG in `seq -w $StageCurrent 1 11`
-    Sequence="04 05 08 09 11" 
     for STG in $Sequence
     do
 
@@ -998,62 +1026,63 @@ do
     PrintMsg normal "\n"
 
 
-    if [ $STG = "00" ] 
+    if [ $STG -eq 00 ] 
     then
+	    echo LLLLLLLLLLLLLLLL
         Stage__Pre-Checks $STG
         ErrorStatus $?
     fi
-    if [ $STG = "01" ]
+    if [ $STG -eq 01 ]
     then
         Stage__Mount $STG
         ErrorStatus $?
     fi
-    if [ $STG = "02" ]
+    if [ $STG -eq 02 ]
     then
         Stage__CopyIso $STG
         ErrorStatus $?
     fi
-    if [ $STG = "03" ]
+    if [ $STG -eq 03 ]
     then
         Stage__CopyACR $STG
         ErrorStatus $?
     fi
-    if [ $STG = "04" ]
+    if [ $STG -eq 04 ]
     then
         Stage__Kickstarts $STG
         ErrorStatus $?
     fi
-    if [ $STG = "05" ]
+    if [ $STG -eq 05 ]
     then
 	Stage__ISOLUNUX $STG
         ErrorStatus $?
     fi
-    if [ $STG = "06" ]
+    if [ $STG -eq 06 ]
     then
 	Stage__ACRPatches $STG
         ErrorStatus $?
     fi
-    if [ $STG = "07" ]
+    if [ $STG -eq 07 ]
     then
 	Stage__ACRTools $STG
         ErrorStatus $?
     fi
-    if [ $STG = "08" ]
+    if [ $STG -eq 08 ]
     then
 	Stage__Combiner $STG
         ErrorStatus $?
     fi
-    if [ $STG = "09" ]
+    if [ $STG -eq 09 ]
     then
 	Stage__GenISOImage $STG
         ErrorStatus $?
     fi
-    if [ $STG = "10" ]
+    if [ $STG -eq 10 ]
     then
 	Stage__Cleanup $STG
         ErrorStatus $?
     fi
-    if [ $STG = "11" ]
+    if [ $STG -eq 11 ]
     then
         exit 0
     fi
@@ -1061,7 +1090,7 @@ do
 #    StageCurrent=`StageProcess_GetLastEnd` 
     done
 
-done
+#done
 
 exit 0
 # if [ -e $Working/target ]; then
@@ -1105,3 +1134,4 @@ exit 0
 # ___PARTLINE_SWAP___
 # ___PARTLINE_CALLS___
 # for JJ in `find  /root/Desktop/acr-build-ISO-WorkMain/workACR-kickstart /root/Desktop/acr-build-ISO-WorkMain/ -mindepth 1 -maxdepth 1 -type d `; do echo $JJ; rm -rf $JJ ; mkdir -v $JJ;done
+#wget http://github.com/johanr89/acr-tools/archive/master.zip
