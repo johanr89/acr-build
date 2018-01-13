@@ -118,7 +118,7 @@ then
             VarText=`echo $VarLine | cut -f3 -d \=`
 		
             if [ `echo $VarPriority | grep "_" | wc -l` -eq 1 ] && [ $IsThisTheFirst = "yes" ]
-	    then
+    	    then
                 NewVal=$VarDefault
             else
                 printf "\n$VarKey\t\"$VarText\" [$VarDefault] : "
@@ -135,19 +135,36 @@ then
 
 	done
 
-        IsThisTheFirst="no"
 
-	printf "\n\nConfirm:\n\n"
-	cat $NewT | cut -c4-999 | sed -e 's/^/\t/g' | sed -e 's/\=/\ \ \ /g' 
-	printf "\n\nAccept [y/n] ? "
+	PrintMsg red "\n\nPlease check and confirm:\n\n"
+    
+    Lcol="normal" ; Ccol="blue" ; Rcol="yellow"
+    while read Line
+    do
+        PrintMsg $Lcol "\t`echo $Line | cut -c4-999 | cut -f1 -d \=`"
+        [ `echo $Line | cut -c4-999 | cut -f1 -d \= | wc -c` -le 8 ] && PrintMsg $Ccol "\t"
+        PrintMsg $Ccol "\t=\t[ "
+        PrintMsg $Rcol "`echo $Line | cut -c4-999 | cut -f2 -d \=`"
+        PrintMsg $Ccol " ]"
+        PrintMsg normal "\n"
+
+	done<$NewT
+
+	PrintMsg red "\nAccept ?"
+	PrintMsg yellow " [y/n] "
+	PrintMsg red "\t\"n\" will enable you to change all additional fields"
 	read Confirm
-
+    PrintMsg normal "\n"
+    IsThisTheFirst="no"
 	mv $NewT $Temp
         	
     done
 
-    mv -f $Temp $MyDir/Host_Config_KS_`date +%F`_`grep -i hostname $Temp | cut -f 4-999 | cut -f2 -d \=`.cfg
+    FileName="$MyDir/Host_Config_KS_"`date +%F`"_"`grep -i hostname $Temp | cut -f 4-999 | cut -f2 -d \=`".cfg"
+    mv -f $Temp $FileName
     [ -f $Temp ] && rm -f $Temp 2>/dev/null
+	PrintMsg yellow "\n\nNew ACR host saved as:\n"
+	PrintMsg normal "\n\t $FileName \n\n"
     exit 0
 
 else
