@@ -24,7 +24,7 @@ IsoSubMenu="ACR_kickstart"
 IsoKSPath="kickstart"
 
 ColorStage="blue"
-# ColorGood="yellow"
+ColorGood="yellow"
 ColorGood="blue"
 ColorFail="red"
 
@@ -94,36 +94,51 @@ function StageProcess_GetLastEnd {
 
 function PrintHead {
 
-    LineColor="yellow" ; LineChars=" -" ; LineLenth="40"
+    LineColor="normal" ; LineChars="=" ; LineLenth="40"
 
-    if [ $2 = "start" ] 
-    then
-        PrintMsg normal "\n"
-        for LineCount in `seq 1 1 $LineLenth`
-        do
-            PrintMsg $LineColor "$LineChars"
-        done
-    fi
+    Stge=$1
+    Name=`GetLastKnownName $Stge`
+
+#    if [ $2 = "start" ] 2>/dev/null
+#    then
+#        PrintMsg normal "\n"
+#        for LineCount in `seq 1 1 $LineLenth`
+#        do
+#            PrintMsg $LineColor "$LineChars"
+#        done
+#    fi
 
     PrintMsg normal "\n"
-    PrintMsg normal " "
-    PrintMsg red "$2"
-    PrintMsg normal " "
-    PrintMsg blue "\t=[ "
-    PrintMsg normal "STAGE "
-    PrintMsg yellow "$1"
-    PrintMsg blue   " ]=\t "
-    PrintMsg normal "\t NAME "
-    PrintMsg yellow "$3"
     PrintMsg normal "\n"
+    PrintMsg normal "\n"
+    PrintMsg normal "====>> "
+    PrintMsg green  "$2"
+    PrintMsg normal " <<===="
+    PrintMsg red "[ "
+    PrintMsg yellow    "$1"
+    PrintMsg red " ]"
+    PrintMsg normal "===============[ "
+    PrintMsg yellow "$Name"
+    PrintMsg normal " ]=======\n"
+    PrintMsg normal "\n"
+    PrintMsg normal "\n"
+
+#    if [ $2 = "ended" ] 2>/dev/null
+#    then
+#        PrintMsg normal "\n"
+#        for LineCount in `seq 1 1 $LineLenth`
+#        do
+#            PrintMsg $LineColor "$LineChars"
+#        done
+#    fi
 
 }
 function Stage__Pre-Checks {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
-    StgTitle="Check Dependancies"
+    StgTitle="Check Dependancies" && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" 
-    
+
     ### ########################## check root permission ########################## 
     SubTitle="root permission"
     let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
@@ -261,40 +276,32 @@ function Check_Issue_Mode {
 
     if [ $Confirm_Wait_Auto = "auto" ] && [ $Issue -ne 0 ] 
     then
-        PrintMsg normal "\n"; PrintMsg yellow " WARNING "; PrintMsg normal "\t"
+        PrintMsg normal "[ Mode : " ; PrintMsg blue   "AUTO" ; PrintMsg normal " ]" ; PrintMsg normal "\t"  ;   PrintMsg yellow " WARNING "
         PrintMsg blue   " ignore and continue ? "
-        PrintMsg normal "\t"; PrintMsg yellow " WARNING "; PrintMsg normal "\t"
-        PrintMsg normal "[ Mode : " ; PrintMsg blue   "AUTO" ; PrintMsg normal " ]"
         read; PrintMsg normal "\n"
     elif [ $Confirm_Wait_Auto = "wait" ]
     then
         if [ $Issue -ne 0 ]  
         then
+            PrintMsg normal "[ Mode : " ; PrintMsg blue   "WAIT" ; PrintMsg normal " ]"
             PrintMsg normal "\n"; PrintMsg yellow " WARNING "; PrintMsg normal "\t"
             PrintMsg blue   " ignore and continue ? "
-            PrintMsg normal "\t"; PrintMsg yellow " WARNING "; PrintMsg normal "\t"
-            PrintMsg normal "[ Mode : " ; PrintMsg blue   "WAIT" ; PrintMsg normal " ]"
             read; PrintMsg normal "\n"
         else
+            PrintMsg normal "[ Mode : " ; PrintMsg blue   "WAIT" ; PrintMsg normal " ]"
             PrintMsg normal "\n";  PrintMsg normal "\t"
             PrintMsg blue   " Waiting $TimeOUT sec ... "
-            PrintMsg normal "\t" PrintMsg normal "\t"
-            PrintMsg normal "[ Mode : " ; PrintMsg blue   "WAIT" ; PrintMsg normal " ]"
             sleep $TimeOUT 
             PrintMsg normal "\n"
         fi
     elif [ $Confirm_Wait_Auto = "confirm" ]
     then
+            PrintMsg normal "[ Mode : " ; PrintMsg blue   "CONFIRM" ; PrintMsg normal " ]"
             PrintMsg normal "\n"; PrintMsg normal "\t"
             PrintMsg blue   " Continue ? "
-            PrintMsg normal "\t"; PrintMsg normal "\t"
-            PrintMsg normal "[ Mode : " ; PrintMsg blue   "CONFIRM" ; PrintMsg normal " ]"
             read; PrintMsg normal "\n"
     else
-            PrintMsg normal "\n"; PrintMsg normal "\t"
-            PrintMsg blue   " All OK.  Go-Go-Go  ... "
-            PrintMsg normal "\t"; PrintMsg normal "\t"
-            PrintMsg normal "[ Mode : " ; PrintMsg blue   "AUTO" ; PrintMsg normal " ]"
+            PrintMsg normal "[ Mode : " ; PrintMsg blue   "AUTO" ; PrintMsg normal " ]" ; PrintMsg normal "\t" ;PrintMsg yellow " result good - auto  Go-Go-Go  "
             sleep 1; PrintMsg normal "\n"
     fi
 
@@ -306,7 +313,7 @@ function Stage__Mount {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
    
-    StgTitle="Everything mount-related"
+    StgTitle="Everything mount-related" && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" $StgTitle
 
     ########################## RHEL iso file ########################## 
@@ -427,7 +434,7 @@ function Stage__Mount {
 function Stage__CopyIso {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
-    StgTitle="Extract required from rhel iso" 
+    StgTitle="Extract required from rhel iso"  && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" $StgTitle
 
     ########################## check root permission ########################## 
@@ -499,7 +506,7 @@ function Stage__CopyACR {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
 
-    StgTitle="Extract software from ACR iso"
+    StgTitle="Extract software from ACR iso" && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" 
     NeedaNewCopy="n"
 
@@ -637,119 +644,132 @@ function CheckLEN { # checks if it has some characters
 function Stage__Kickstarts {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
-    StgTitle="Check Dependancies"
-    PrintHead $StgNum "start" 
+    StgTitle="Kickstart Builder ckecs" && echo ":"$StgNum":"$StgTitle >> $StageListFile
+    PrintHead $StgNum "start" $StgTitle
 
-    SubTitle="root permission"
+    SubTitle="Check Template"
     let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
-    # PrintMsg $ColorGood "OK"
-    # PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
 
 
-    PrintMsg normal "\nRecorder template\t"
     TemplateNormalACR=$MyDir"/template/kickstart-acr.template"
     TemplatePostACR=$MyDir"/template/kickstart-post.template"
     if [ -f $TemplateNormalACR ] && [ -f $TemplatePostACR ]
     then
         if [ `grep -v ^# $TemplateNormalACR | grep ___ | wc -l` -gt 1 ]
-	then
-            PrintMsg blue "OK"
-            PrintMsg normal "\tFound normal ACR template $TemplateNormalACR"
-	else
-            PrintMsg red "FAIL"
+    	then
+            PrintMsg $ColorGood "OK"
+    	else
+            PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
             PrintMsg normal "\tNot usable template found as $TemplateNormalACR"
             return 51
         fi 
     else
-        PrintMsg red "FAIL"
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
         PrintMsg normal "\tNot found $TemplateNormalACR"
         return 52
     fi
 
     [ -d $WorkAcrKickstart ] || mkdir -p $WorkAcrKickstart 
-    rm -f $WorkAcrKickstart/ks_*.cfg 2>/dev/null
 
-    PrintMsg normal "\n\nBUILD:\t$WorkAcrKickstart\t"
-    PrintMsg blue "..."
-    PrintMsg normal "\n"
 
     for Host in `ls -1 ${MyDir}/Host_Config*`
     do
-        PrintMsg normal "\t`echo $Host | sed -e 's/\.\///g'`\t"
-	# Keep_Calls
-        HostKeepCalls=`grep \:Keep_Calls $Host | cut -f2 -d \=` ; CheckLEN $HostKeepCalls || return $STG
-       	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tKeepCalls : $HostKeepCalls"
+        SubTitle="Read config "$Host
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
 
-        #  Hostname #  ___HOSTNAME___
-       	HostFQDN=`grep \:Hostname $Host | cut -f2 -d \=` ; CheckLEN $HostFQDN || return $STG
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHostname : $HostFQDN"
-	WorkingKSOUT=$WorkAcrKickstart/"ks__"`echo $HostFQDN | sed -e 's/\./_/g'`"__.cfg" 
+        ErCoBuildHost="0"
+                    # || let ErCoBuildHost=$ErCoBuildHost+1 
 
-	if [ `echo $HostKeepCalls | egrep -i '(yes)' | egrep -vi '(no)' | wc -l` -gt 0 ]
-	then
+        HostKeepCalls=`grep \:Keep_Calls $Host | cut -f2 -d \=`                  || let ErCoBuildHost=$ErCoBuildHost+1 
+            CheckLEN $HostKeepCalls                                              || let ErCoBuildHost=$ErCoBuildHost+1 
+
+       	HostFQDN=`grep \:Hostname $Host | cut -f2 -d \=`                         || let ErCoBuildHost=$ErCoBuildHost+1
+            CheckLEN $HostFQDN                                                   || let ErCoBuildHost=$ErCoBuildHost+1
+        
+        WorkingKSOUT=$WorkAcrKickstart/"ks__"`echo $HostFQDN | sed -e 's/\./_/g'`"__.cfg" || let ErCoBuildHost=$ErCoBuildHost+1
+
+    	if [ `echo $HostKeepCalls | egrep -i '(yes)' | egrep -vi '(no)' | wc -l` -gt 0 ]
+    	then
             grep -vi clearpart $TemplateNormalACR > $WorkingKSOUT
-	elif [ `echo $HostKeepCalls | egrep -vi '(yes)' | egrep -i '(no)' | wc -l` -gt 0 ]
+
+    	elif [ `echo $HostKeepCalls | egrep -vi '(yes)' | egrep -i '(no)' | wc -l` -gt 0 ]
         then
-            cat $TemplateNormalACR > $WorkingKSOUT
+            cat $TemplateNormalACR > $WorkingKSOUT                              || let ErCoBuildHost=$ErCoBuildHost+1
         fi
-	sed -i 's/___HOSTNAME___/'$HostFQDN'/g' $WorkingKSOUT
+        
+        sed -i 's/___HOSTNAME___/'$HostFQDN'/g' $WorkingKSOUT                   || let ErCoBuildHost=$ErCoBuildHost+1
 
-        #  Keyboard #  ___KEYBOARD___
-        HostKeyboard=`grep \:Keyboard $Host | cut -f2 -d \=` ; CheckLEN $HostKeyboard || return $STG
-       	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tKeyboard : $HostKeyboard"
-	sed -i 's/___KEYBOARD___/'$HostKeyboard'/g' $WorkingKSOUT
+        if [ $ErCoBuildHost -gt 0 ]
+        then
+             PrintMsg $ColorFail "FAIL"; let Issue=$Issue+1
+        else
+            PrintMsg $ColorGood "OK" 
+        fi
 
-        #  NIC #  ___NICDEV___
-        HostNic=`grep \:NIC $Host | cut -f2 -d \=` ; CheckLEN $HostNic || return $STG
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNIC : $HostNic"
-	sed -i 's/___NICDEV___/'$HostNic'/g' $WorkingKSOUT
+    ###########################################################################################        
 
-        #  IP #  ___IPADDRESS___
-        HostIpAddress=`grep \:IP $Host | cut -f2 -d \=` ; CheckLEN $HostIpAddress || return $STG
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tIP-Address : $HostIpAddress"
-	sed -i 's/___IPADDRESS___/'$HostIpAddress'/g' $WorkingKSOUT
+        ErCoBuildHost="0" ; Ctr="0"
 
-        #  Netmask #  ___NETMASK___
-        HostNetmask=`grep \:Netmask $Host | cut -f2 -d \=` ; CheckLEN $HostNetmask || return $STG
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNetmask : $HostNetmask"
-	sed -i 's/___NETMASK___/'$HostNetmask'/g' $WorkingKSOUT
 
-        #  Default_Route #  ___GATEWAY___
-        HostGateway=`grep \:Default_Route $Host | cut -f2 -d \=` ; CheckLEN $HostGateway || return $STG
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tGateway : $HostGateway"
-	sed -i 's/___GATEWAY___/'$HostGateway'/g' $WorkingKSOUT
+        SubTitle="Fill Ks values "$Hosta ; let Stepper=$Stepper+1 
+        printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
 
-        #  DNS_Server #  ___NAMESERVER___
-        HostNameServer=`grep \:DNS_Server $Host | cut -f2 -d \=` ; CheckLEN $HostNameServer || return $STG
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNameServer : $HostNameServer"
-	sed -i 's/___NAMESERVER___/'$HostNameServer'/g' $WorkingKSOUT
+        HostKeyboard=`grep \:Keyboard $Host | cut -f2 -d \=`                    || let ErCoBuildHost=$ErCoBuildHost+1
+            CheckLEN $HostKeyboard  || let ErCoBuildHost=$ErCoBuildHost+1       || let ErCoBuildHost=$ErCoBuildHost+1
+                sed -i 's/___KEYBOARD___/'$HostKeyboard'/g' $WorkingKSOUT       || let ErCoBuildHost=$ErCoBuildHost+1
 
-        #  TimeZone #  ___TIMEZONE___
-        HostTZ=`grep \:TimeZone $Host | cut -f2 -d \= | sed -e 's/\//\\\\\//g'` ; CheckLEN $HostTZ || return $STG
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tTimeZone : $HostTZ"
-	sed -i 's/___TIMEZONE___/'${HostTZ}'/g' $WorkingKSOUT
+        HostNic=`grep \:NIC $Host | cut -f2 -d \=`                              || let ErCoBuildHost=$ErCoBuildHost+1
+                CheckLEN $HostNic                                               || let ErCoBuildHost=$ErCoBuildHost+1
+                sed -i 's/___NICDEV___/'$HostNic'/g' $WorkingKSOUT              || let ErCoBuildHost=$ErCoBuildHost+1
 
-        #  NTP_Server #  ___NTPSERVER___
-        HostNTP=`grep \:NTP_Server $Host | cut -f2 -d \=` ; CheckLEN $HostNTP || return $STG
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNTP : $HostNTP"
-	sed -i 's/___NTPSERVER___/'$HostNTP'/g' $WorkingKSOUT
+        HostIpAddress=`grep \:IP $Host | cut -f2 -d \=`                         || let ErCoBuildHost=$ErCoBuildHost+1
+            CheckLEN $HostIpAddress                                             || let ErCoBuildHost=$ErCoBuildHost+1
+            sed -i 's/___IPADDRESS___/'$HostIpAddress'/g' $WorkingKSOUT         || let ErCoBuildHost=$ErCoBuildHost+1
 
-        HostCust=`grep \:Customer $Host | cut -f2 -d \= | sed -e 's/\ /\\\\\ /g'` ; CheckLEN $HostCust || return $STG
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tTimeZone : $HostCust"
-	export $HostCust
+        HostNetmask=`grep \:Netmask $Host | cut -f2 -d \=`                      || let ErCoBuildHost=$ErCoBuildHost+1
+            CheckLEN $HostNetmask || return $STG                                || let ErCoBuildHost=$ErCoBuildHost+1
+            sed -i 's/___NETMASK___/'$HostNetmask'/g' $WorkingKSOUT             || let ErCoBuildHost=$ErCoBuildHost+1
 
-        # NumberOfDisks
-        HostNumOfDisk=`grep \:NumberOfDisks $Host | cut -f2 -d \=` 
-	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tNumberOfDisks : $HostNumOfDisks"
+        HostGateway=`grep \:Default_Route $Host | cut -f2 -d \=`                || let ErCoBuildHost=$ErCoBuildHost+1
+            CheckLEN $HostGateway                                               || let ErCoBuildHost=$ErCoBuildHost+1
+            sed -i 's/___GATEWAY___/'$HostGateway'/g' $WorkingKSOUT             || let ErCoBuildHost=$ErCoBuildHost+1
 
-	if [ `echo $HostNumOfDisk | egrep -i '(2|two)' | wc -l` -ge 1 ]
-	then
+        HostNameServer=`grep \:DNS_Server $Host | cut -f2 -d \=`                || let ErCoBuildHost=$ErCoBuildHost+1
+            CheckLEN $HostNameServer                                            || let ErCoBuildHost=$ErCoBuildHost+1
+            sed -i 's/___NAMESERVER___/'$HostNameServer'/g' $WorkingKSOUT       || let ErCoBuildHost=$ErCoBuildHost+1
+
+        HostTZ=`grep \:TimeZone $Host | cut -f2 -d \= | sed -e 's/\//\\\\\//g'` || let ErCoBuildHost=$ErCoBuildHost+1
+            CheckLEN $HostTZ                                                    || let ErCoBuildHost=$ErCoBuildHost+1
+            sed -i 's/___TIMEZONE___/'${HostTZ}'/g' $WorkingKSOUT               || let ErCoBuildHost=$ErCoBuildHost+1
+
+        HostNTP=`grep \:NTP_Server $Host | cut -f2 -d \=`                       || let ErCoBuildHost=$ErCoBuildHost+1
+            CheckLEN $HostNTP                                                   || let ErCoBuildHost=$ErCoBuildHost+1
+    	    sed -i 's/___NTPSERVER___/'$HostNTP'/g' $WorkingKSOUT               || let ErCoBuildHost=$ErCoBuildHost+1
+
+        HostCust=`grep \:Customer $Host | cut -f2 -d \= | sed -e 's/\ /\\\\\ /g'` || let ErCoBuildHost=$ErCoBuildHost+1
+            CheckLEN $HostCust                                             || let ErCoBuildHost=$ErCoBuildHost+1
+	        export $HostCust
+
+        HostNumOfDisk=`grep \:NumberOfDisks $Host | cut -f2 -d \=`          || let ErCoBuildHost=$ErCoBuildHost+1
+    	if [ `echo $HostNumOfDisk | egrep -i '(2|two)' | wc -l` -ge 1 ]
+    	then
             HostDiskCount=2
         else # asume 1
             HostDiskCount=1
         fi
 
-        [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHostDiskCount : $HostDiskCount"
+
+        if [ $ErCoBuildHost -gt 0 ]
+        then
+             PrintMsg $ColorFail "FAIL"; let Issue=$Issue+1
+        else
+            PrintMsg $ColorGood "OK" 
+        fi
+    ###########################################################################################        
+
+        SubTitle="FS logic $Hosta" && ErCoBuildHost=0
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+
 
         HostLineBoot="part /boot"
         HostLineRoot="part /"
@@ -802,34 +822,42 @@ function Stage__Kickstarts {
 
         fi
 
-        CheckLEN $HostLineBoot     || return $STG
-        CheckLEN $HostLineRoot     || return $STG
-        CheckLEN $HostLineWitness  || return $STG
-        CheckLEN $HostLinePostgres || return $STG
-        CheckLEN $HostLineSwap     || return $STG
-        CheckLEN $HostLineCalls    || return $STG
+        CheckLEN $HostLineBoot     || let ErCoBuildHost=$ErCoBuildHost+1
+        CheckLEN $HostLineRoot     || let ErCoBuildHost=$ErCoBuildHost+1
+        CheckLEN $HostLineWitness  || let ErCoBuildHost=$ErCoBuildHost+1
+        CheckLEN $HostLinePostgres || let ErCoBuildHost=$ErCoBuildHost+1
+        CheckLEN $HostLineSwap     || let ErCoBuildHost=$ErCoBuildHost+1
+        CheckLEN $HostLineCalls    || let ErCoBuildHost=$ErCoBuildHost+1
 
-	echo $HostLineBoot >> $WorkingKSOUT     ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHost Line Boot : $HostLineBoot"
-	echo $HostLineRoot >> $WorkingKSOUT     ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHost Line Root : $HostLineRoot"
-	echo $HostLinePostgres >> $WorkingKSOUT ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHost Line Postgres : $HostLinePostgres"
-	echo $HostLineWitness >> $WorkingKSOUT  ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHost Line Witness : $HostLineWitness"
-	echo $HostLineSwap >> $WorkingKSOUT     ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHost Line Swap : $HostLineSwap"
-	echo $HostLineCalls >> $WorkingKSOUT    ; [ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tHost Line Calls : $HostLineCalls"
 
-        cat $TemplatePostACR >> $WorkingKSOUT
+        if [ $ErCoBuildHost -gt 0 ]
+        then
+             PrintMsg $ColorFail "FAIL"; let Issue=$Issue+1
+        else
+            PrintMsg $ColorGood "OK" 
+        fi
 
-        PrintMsg blue "OK"
-        PrintMsg normal "\n"
+    ###########################################################################################        
+        SubTitle="Write FS-config $Hosta" && ErCoBuildHost=0
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+
+    	    echo $HostLineBoot >> $WorkingKSOUT      || let ErCoBuildHost=$ErCoBuildHost+1
+        	echo $HostLineRoot >> $WorkingKSOUT      || let ErCoBuildHost=$ErCoBuildHost+1
+        	echo $HostLinePostgres >> $WorkingKSOUT  || let ErCoBuildHost=$ErCoBuildHost+1
+         	echo $HostLineWitness >> $WorkingKSOUT   || let ErCoBuildHost=$ErCoBuildHost+1
+    	    echo $HostLineSwap >> $WorkingKSOUT      || let ErCoBuildHost=$ErCoBuildHost+1
+    	    echo $HostLineCalls >> $WorkingKSOUT     || let ErCoBuildHost=$ErCoBuildHost+1
+            cat $TemplatePostACR >> $WorkingKSOUT    || let ErCoBuildHost=$ErCoBuildHost+1
+
+        if [ $ErCoBuildHost -gt 0 ]
+        then
+             PrintMsg $ColorFail "FAIL"; let Issue=$Issue+1
+        else
+            PrintMsg $ColorGood "OK" 
+        fi
+    ###########################################################################################        
 
     done
-    PrintMsg normal "BUILD:\t$WorkAcrKickstart\t"
-    PrintMsg blue "OK"
-    PrintMsg normal "\n"
-
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg $ColorStage "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    PrintMsg normal "\n"
-    return 0
 
 # CRS_Layout
 
@@ -853,97 +881,79 @@ function Stage__ISOLUNUX {
     [ -d ${WorkRHEL}/${IsoKSPath} ] || mkdir -p ${WorkRHEL}/${IsoKSPath} 
     if [ -d ${WorkRHEL}/${IsoKSPath} ]
     then
-	IsoKsDest=${WorkRHEL}/${IsoKSPath}
+	    IsoKsDest=$WorkRHEL/$IsoKSPath
         PrintMsg blue "OK"
-        PrintMsg normal "\tFound: ${WorkRHEL}/${IsoKSPath}"
     else
         PrintMsg red "FAIL"
         PrintMsg normal "\tNot found: ${WorkRHEL}/${IsoKSPath}"
-	return $STG
+	    return $STG
     fi
 
     PrintMsg normal "\nCheck menu templates\t"
     if [ -f $TemplateISODefault ] && [ -f $TemplateISOaSingle ] && [ -f $TemplateISOtoFinal ]
     then
         PrintMsg blue "OK"
-        PrintMsg normal "\tFound 3x required"
     else
         PrintMsg red "FAIL"
         PrintMsg normal "\tNot all are available."
-	return $STG
+	    return 5
     fi
 
     PrintMsg normal "\nCollect variales\t"
 
-      CheckLEN $HostCust   || exit 1A
       Date=`date +%F`
       Text="acr-build"
       IsoHostTitle=`echo $HostCust | sed -e 's/\ /_/g' | sed -e 's/\./_/g'`
 
-      CheckLEN $IsoLabel   || exit 2
       IsoHdLabel=$IsoLabel                       # isolinux-default.template  ___HdLabel___           # IsoLabel
 
-      # IsoSubMenu=$HostCust"\ kickstart\ ACR"
       IsoSubMenu="ACR_Kickstart"
-      CheckLEN $IsoSubMenu || exit 3             # isolinux-default.template  ___SubMenu___           # HostCust
-    PrintMsg blue "OK"
-    PrintMsg normal "\n"
-
-
 
     PrintMsg normal "\nPer kickstart\t"
-    if [ `ls -1 $WorkAcrKickstart/ks__*.cfg | wc -l` -gt 1 ]
+
+    if [ `ls -1 $WorkAcrKickstart/ks__*.cfg | wc -l` -ge 1 ]
     then
-        PrintMsg normal "\nIndividual Host Files\t"
-        PrintMsg blue "..."
 
-	TemplateTMPISOCombo="/tmp/.isolinux_Combo_"`date +%F`"_"$$".tmp"
+        TemplateTMPISOCombo=/tmp/".isolinux_Combo_"`date +%F`"_"$$".tmp"
 
-	cd $WorkAcrKickstart/
+        cd $WorkAcrKickstart/
+
         for AcrKsFile in `ls -1 ks__*.cfg`
-	do
-            PrintMsg normal "\n\t$AcrKsFile\t" 
-
-	    TestSingle=0
-
+        do   
+    	    TestSingle=0
             #   IsoSingleLable  == { ___SingleLabel___ }  @  [ isolinux-single.template ]
-	    #     #    Explain "sed" :      | change "." to "_"  | double "_" to one | rem leading "_"  | rem trailing "_" | rem leadingi  "ks_"
-	    IsoSingleLable=`echo $AcrKsFile | cut -f1 -d \.  | sed -e 's/__/_/g' | sed -e 's/^_//g' | sed -e 's/_$//g' | sed -e 's/^ks_//g'` 
+	        #     #    Explain "sed" :      | change "." to "_"  | double "_" to one | rem leading "_"  | rem trailing "_" | rem leadingi  "ks_"
+    	    IsoSingleLable=`echo $AcrKsFile | cut -f1 -d \.  | sed -e 's/__/_/g' | sed -e 's/^_//g' | sed -e 's/_$//g' | sed -e 's/^ks_//g'` 
 
-	    IsoSingleMenuText=$IsoSingleLable # isolinux-single.template   ___SingleMenuText___    # FQDN ?
-	    IsoSingleMenuHelpText="IpAddr__"`grep -v ^# $AcrKsFile | grep "ip=" | sed -e 's/\ /\n/g' | grep "ip=" | cut -f2 -d \= | sed -e 's/\./_/g'`
-	    IsoSingleMenuHdLabel=$IsoHdLabel # isolinux-single.template   ___HdLabel___           # IsoLabel
-	    IsoSingleFullPathKsFile=`echo '\\/'$IsoKSPath'\\/'$AcrKsFile`    # ="/kickstart" # isolinux-single.template   ___FullPathToKsCfg___   # /kickstart/
-	    IsoSingleHelpText="Install Now"
-	    TemplateTMPISOSingle="/tmp/.isolinux_Sngle_"$IsoSingleLable"_"`date +%F`"_"$$".tmp"
+            IsoSingleMenuText=$IsoSingleLable # isolinux-single.template   ___SingleMenuText___    # FQDN ?
+            IsoSingleMenuHelpText="IpAddr__"`grep -v ^# $AcrKsFile | grep "ip=" | sed -e 's/\ /\n/g' | grep "ip=" | cut -f2 -d \= | sed -e 's/\./_/g'`
+            IsoSingleMenuHdLabel=$IsoHdLabel # isolinux-single.template   ___HdLabel___           # IsoLabel
+            IsoSingleFullPathKsFile=`echo '\\/'$IsoKSPath'\\/'$AcrKsFile`    # ="/kickstart" # isolinux-single.template   ___FullPathToKsCfg___   # /kickstart/
+    	    IsoSingleHelpText="Install Now"
+            TemplateTMPISOSingle="/tmp/.isolinux_Sngle_"$IsoSingleLable"_"`date +%F`"_"$$".tmp"
             cat $TemplateISOSingle > $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
-	    cp -f $AcrKsFile $IsoKsDest/$AcrKsFile          || let TestSingle=$TestSingle+1
+            cp -f $AcrKsFile $IsoKsDest/$AcrKsFile          || let TestSingle=$TestSingle+1
 
-	          #   ___FullPathToKsCfg___  $IsoSingleFullPathKsFile     isolinux-single.template 
+            #   ___FullPathToKsCfg___  $IsoSingleFullPathKsFile     isolinux-single.template 
             sed -i 's/___FullPathToKsCfg___/'$IsoSingleFullPathKsFile'/g' $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
 
        	    #   ___SingleLabel___  $IsoSingleLable                  isolinux-single.template 
-            [ $DEBUG = "true" ]  && let DEBCNT=$DEBCNT+1 && DT="IsoSingleLable"  &&  DV=$IsoSingleLable  &&  printf "\ntDEBUG\t[ Nme: $DT ]\t[ Val: $DV ]\t{ Er: $? }\t( Nr: $DEBCNT )\n"
             sed -i 's/___SingleLabel___/'$IsoSingleLable'/g'              $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
-
-
-            [ $DEBUG = "true" ]  && let DEBCNT=$DEBCNT+1 && DT="IsoSingleMenuHelpText"  &&  DV=$IsoSingleMenuHelpText &&  printf "\ntDEBUG\t[ Nme: $DT ]\t[ Val: $DV ]\t{ Er: $? }\t( Nr: $DEBCNT )\n"
             sed -i 's/___SingleHelpText___/'$IsoSingleMenuHelpText'/g'              $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
-
-            #   ___SingleMenuText___  $IsoSingleMenuText            isolinux-single.template 
-            [ $DEBUG = "true" ]  && let DEBCNT=$DEBCNT+1 && DT="IsoSingleMenuText"  &&  DV=${IsoSingleMenuText}  &&  printf "\n\tDEBUG\t[ Nme: $DT ]\t[ Val: $DV ]\t{ Er: $? }\t( Nr: $DEBCNT )\n"
             sed -i 's/___SingleMenuText___/'$IsoSingleMenuText'/g'        $TemplateTMPISOSingle || let TestSingle=$TestSingle+1
 
-            [ $DEBUG = "true" ]  && let DEBCNT=$DEBCNT+1 && DT="TestSingle"  &&  DV=${TestSingle}  &&  printf "\n\tDEBUG\t[ Nme: $DT ]\t[ Val: $DV ]\t{ Er: $? }\t( Nr: $DEBCNT )\n"
-	    if [ $TestSingle -eq 0 ]
+
+            cat $TemplateTMPISOSingle >> $TemplateTMPISOCombo     # J1
+
+    	    if [ $TestSingle -eq 0 ]
             then
-	        cat $TemplateTMPISOSingle >> $TemplateTMPISOCombo && rm -f $TemplateTMPISOSingle 
+	            #cat $TemplateTMPISOSingle >> $TemplateTMPISOCombo # J1
                 PrintMsg blue "OK"
                 PrintMsg normal "\t"
             else
                 PrintMsg red "FAIL"
                 PrintMsg normal "\t"
-		return 65
+        		return 65
             fi
 
 	done
@@ -951,25 +961,29 @@ function Stage__ISOLUNUX {
 
     # TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
 
-    PrintMsg normal "\nInitiate isolinux\t"
+        PrintMsg normal "\nInitiate isolinux\t"
 
-      if [ -f $WorkRHEL/isolinux/isolinux.cfg ]
-      then
-          cp $WorkRHEL/isolinux/isolinux.cfg $WorkRHEL/isolinux/.isolinux.cfg_`date +%F`_$$ 
-	  TemplateTMPISODefault="/tmp/.isolinux_"`date +%F`"_"$$".tmp"
-          # cat $TemplateISODefault > $WorkRHEL/isolinux/isolinux.cfg
+        if [ -f $WorkRHEL/isolinux/isolinux.cfg ]
+        then
+            ErrCnt="0"
+            TemplateTMPISODefault=/tmp/".isolinux_"`date +%F`"_"$$".tmp" || exit 992
 
-          cat $TemplateISODefault > $TemplateTMPISODefault \
-		  && cat $TemplateTMPISOCombo >> $TemplateTMPISODefault \
-		  && rm -f $TemplateTMPISOCombo \
-		  && cat $TemplateISOtoFinal >> $TemplateTMPISODefault
+            [ -f $TemplateISODefault  ] && cat $TemplateISODefault  >  $TemplateTMPISODefault || exit 94
+            [ -f $TemplateTMPISOCombo ] && cat $TemplateTMPISOCombo >> $TemplateTMPISODefault || exit 95   
+            [ -f $TemplateISOtoFinal  ] && cat $TemplateISOtoFinal  >> $TemplateTMPISODefault || exit 96  
+            
+	        if [ $? -ne 0 ]
+            then
+                PrintMsg red "FAIL" 
+                return 87
+            else
+                PrintMsg blue "OK" 
+            fi
 
-	  [ $? -ne 0 ] && PrintMsg red "FAIL" && return 87
-          PrintMsg blue "OK" 
-      else
-          PrintMsg red "FAIL"
-	  return 87
-      fi
+        else
+            PrintMsg red "FAIL"
+            return 87
+        fi
 
     PrintMsg normal "\nMain isolinux bits\n"
 
@@ -990,27 +1004,30 @@ function Stage__ISOLUNUX {
 	    exit 1
     fi
     PrintMsg $ColorStage "\nAccept ? [y/n] "
-    # read ConfIso
-    ConfIso="y"
-    PrintMsg normal "\n\tAssume \"y\"\n" ; sleep 3
-    [ $ConfIso = "y" ] || exit 22
+    read ConfIso
+    PrintMsg normal "\n"
+    if [ $ConfIso = "y" ] || [ $ConfIso = "Y" ] 2>/dev/null
+    then
+        PrintMsg green "\nConfirmed, writing ..." ; PrintMsg normal "\n"
+        cp  ${WorkRHEL}/isolinux/isolinux.cfg /tmp/.isolinix.cfg.orig_`date +%F`_$$ \
+	    cat $TemplateTMPISODefault > ${WorkRHEL}/isolinux/isolinux.cfg
+        IsoLinuxExitCode=$?
 
-    cp -v ${WorkRHEL}/isolinux/isolinux.cfg /tmp/.isolinix.cfg.orig_`date +%F`_$$ \
-	    && cat $TemplateTMPISODefault > ${WorkRHEL}/isolinux/isolinux.cfg
-    [ $? -ne 0 ] && exit 1
-
-    # PrintMsg normal "\n\n==[ " && PrintMsg blue "Stage" &&  PrintMsg yellow "$StgNum" && PrintMsg normal " ]=========[\t" && PrintMsg red "\t$StgTitle" && PrintMsg normal "\t]==\n\n"
+    elif [ $ConfIso = "n" ] || [ $ConfIso = "N" ] 2>/dev/null
+    then
+        PrintMsg green "\nNot writing to ISO, exit." ; PrintMsg normal "\n"
+        exit 0
+    fi
 
     PrintHead $StgNum "ended" $StgTitle
-    let Issue=$Issue+1     # A break to manually update files #
-    Check_Issue_Mode $Issue "A break to manually update files"
+    Check_Issue_Mode $Issue $StgNum
 
 }
 
 function Stage__ACRPatches {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
-    StgTitle="ACR Patches"
+    StgTitle="ACR Patches" && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" 
     PatchDirInWitness="patches"
 
@@ -1034,7 +1051,7 @@ function Stage__ACRPatches {
 function Stage__ACRTools {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
-    StgTitle="Check Dependancies"
+    StgTitle="Bundle acr-tools github" && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" 
     
 ### ########################## check root permission ########################## 
@@ -1074,7 +1091,7 @@ function Stage__Combiner {
 
 ### sample y9j
     StgNum=$1 ; Issue="0" ; Stepper=0
-    StgTitle="Combine everyting"
+    StgTitle="Combine everyting" && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" 
     
     PatchDirInWitness="patches"
@@ -1136,7 +1153,7 @@ function Stage__Combiner {
 function Stage__GenISOImage {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
-    StgTitle="Generate ISO"
+    StgTitle="Generate ISO" && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" 
     
 ### ########################## check root permission ########################## 
@@ -1184,7 +1201,8 @@ function Stage__GenISOImage {
 function Stage__Cleanup {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
-    StgTitle="Cleanup" ; PrintHead $StgNum "start" $StgTitle
+    StgTitle="Cleanup"  && echo ":"$StgNum":"$StgTitle >> $StageListFile
+    PrintHead $StgNum "start" $StgTitle
 
 # ########################## ? ########################## 
 # SubTitle="root permission"
@@ -1200,17 +1218,16 @@ function Stage__Cleanup {
 
 function ErrorStatus {
 
-        ErrCode=$1
-
-	if [ $ErrCode -ne 0 ]
+	if [ $1 -ne 0 ] 2>/dev/null
 	then
 	    echo "Error Exit "$ErrCode
 	    exit 1
-        else
-            return 0
-        fi
+    else
+        return 0
+    fi
 	echo " OOPSIE "; exit 999
 }
+
 function CleanDirs {
 
 	PrintMsg blue "\n\nClean Directories:\n"
@@ -1240,9 +1257,6 @@ function CleanDirs {
     return 0
 }
 
-function StageList {
-	echo
-}
 function GetLastKnownName {
 
     StgQ=$1
@@ -1372,6 +1386,8 @@ function ListStageUpdate {
 
 DEBUG=false
 #DEBUG="true"
+export ErrCount="0"
+export ErrNumCalls="0"
 
 StageMin="00"
 StageMax="12"
@@ -1479,6 +1495,5 @@ fi
     fi
 
     done
-
 
 exit 0
