@@ -453,7 +453,7 @@ function Stage__CopyIso {
         if [ $? -eq 0 ] && [ -d $WorkRHEL ]
         then
                 {
-                    rsync -az $Rhl_Mnt/* $WorkRHEL/. 
+                    time rsync -az $Rhl_Mnt/* $WorkRHEL/. 
                     ExCoRsync=$?
 
                 }&>/tmp/.rsync.rhel.$$.log
@@ -1008,15 +1008,24 @@ function Stage__ISOLUNUX {
     PrintMsg normal "\n"
     if [ $ConfIso = "y" ] || [ $ConfIso = "Y" ] 2>/dev/null
     then
+        ISO_Issues="0"    
         PrintMsg green "\nConfirmed, writing ..." ; PrintMsg normal "\n"
-        cp  ${WorkRHEL}/isolinux/isolinux.cfg /tmp/.isolinix.cfg.orig_`date +%F`_$$ \
-	    cat $TemplateTMPISODefault > ${WorkRHEL}/isolinux/isolinux.cfg
-        IsoLinuxExitCode=$?
+        cp  ${WorkRHEL}/isolinux/isolinux.cfg /tmp/.isolinix.cfg.orig_`date +%F`_$$
+	    cat $TemplateTMPISODefault > ${WorkRHEL}/isolinux/isolinux.cfg || let ISO_Issues=$ISO_Issues+1
+        [ `cat ${WorkRHEL}/isolinux/isolinux.cfg | grep "___" | wc -l` -lt 1 ] || let ISO_Issues=$ISO_Issues+1
+        [ `cat ${WorkRHEL}/isolinux/isolinux.cfg | wc -l` -lt 10 ] && let ISO_Issues=$ISO_Issues+1
+        [ `cat ${WorkRHEL}/isolinux/isolinux.cfg | grep $IsoLabel | wc -l` -lt 1 ] && let ISO_Issues=$ISO_Issues+1
 
     elif [ $ConfIso = "n" ] || [ $ConfIso = "N" ] 2>/dev/null
     then
         PrintMsg green "\nNot writing to ISO, exit." ; PrintMsg normal "\n"
         exit 0
+    fi
+    if [ $ISO_Issuesi -gt 0 ]
+    then
+             PrintMsg $ColorFail "FAIL"; let Issue=$Issue+1
+    else
+            PrintMsg $ColorGood "OK" 
     fi
 
     PrintHead $StgNum "ended" $StgTitle
@@ -1069,10 +1078,10 @@ function Stage__ACRTools {
 
     CurDir=`pwd -P`
     cd $WorkAcrTools \
-	    && wget -O master.$$.zip $AcrTools_Url \
-	    && unzip master.$$.zip \
-	    && rm -f  master.$$.zip \
-	    && tar -cvzf $WorkRHEL/acr-tools.tgz acr-tools-master \
+	    && wget -O master.$$.zip $AcrTools_Url &>/dev/null \
+	    && unzip master.$$.zip &>/dev/null  \
+	    && rm -f  master.$$.zip  &>/dev/null  \
+	    && tar -cvzf $WorkRHEL/acr-tools.tgz acr-tools-master  &>/dev/null \
 	    && cd $WorkRHEL/ \
 	    && sha1sum acr-tools.tgz | tee acr-tools.tgz.`date +%F`.sha1sum.txt 
 
@@ -1177,7 +1186,7 @@ function Stage__GenISOImage {
         {
             [ -f $WorkMain/$IsoLabel.iso ] && rm -f $WorkMain/$IsoLabel.iso 
 
-            genisoimage -o $WorkMain/$IsoLabel.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot \
+            time genisoimage -o $WorkMain/$IsoLabel.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot \
                 -V $IsoLabel -boot-load-size 4 -boot-info-table -R -J -v -T ./ 
             
             ExCoGen=$?
