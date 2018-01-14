@@ -1,22 +1,32 @@
 #!/bin/bash
 
+Confirm_Wait_Auto="auto"
+TimeOUT="5"
+
 IsoLabel="ACR_BUILD"
 WorkMain="/root/Desktop/acr-build-ISO-WorkMain"
 WorkRHEL=$WorkMain"/workRHEL"
 WorkAcrSw=$WorkMain"/workACR-software"
 WorkAcrPatch=$WorkMain"/workACR-patch"
 WorkAcrKickstart=$WorkMain"/workACR-kickstart"
+WorkAcrTools=$WorkMain"/workACR-tools"
+AcrTools_Url="http://github.com/johanr89/acr-tools/archive/master.zip"
 ColDBG="normal"
 
 StageTrackPrefix="/tmp/.build_iso_stage_tracker"
+StageListFile="/tmp/buil_stagelist.txt"
 StageTrackFile=$StageTrackPrefix"_"$$".tmp"
 
 KsCreator="add-ACR_kickstart.sh"
 DefaultsFile="create-an-ACR.variables.cfg"
 Prefix=`grep -i ^prefix $KsCreator | cut -f2 -d\"` 
-TimeOUT="1"
 IsoSubMenu="ACR_kickstart"
 IsoKSPath="kickstart"
+
+ColorStage="blue"
+# ColorGood="yellow"
+ColorGood="blue"
+ColorFail="red"
 
 color_red=$'\033[31;1m'
 color_green=$'\033[32;1m'
@@ -63,167 +73,281 @@ case $1 in
 esac
 
 }
+
 function StageProcess_GetLastEnd {
 
-    if [ `ls -1tr $StageTrackPrefix* | wc -l` -gt 0 ]
+    if [ -f $StageTrackPrefix ]
     then
-         LastStageFile=`ls -1tr $StageTrackPrefix* | tail -1` 2>/dev/null
-	 LastCompleted=`grep -i \:end $LastStageFile | tail -1 | cut -f1 -d \:` 2>/dev/null
-	 echo $LastCompleted
-         return 0
+
+        [ `cat $StageTrackPrefix 2>/dev/null | wc -l` -gt 0 ] &&  Stage=`tail -1 $StageTrackPrefix` 2>/dev/null
+        if [ `echo $Stage | wc -c` -gt 1 ]
+        then
+            echo $Stage
+            return 0
+        fi
     fi
 
-    echo S00
-    return 0
+    echo "00"
+    return 1
+
 }
 
+function PrintHead {
+
+    LineColor="yellow" ; LineChars=" -" ; LineLenth="40"
+
+    if [ $2 = "start" ] 
+    then
+        PrintMsg normal "\n"
+        for LineCount in `seq 1 1 $LineLenth`
+        do
+            PrintMsg $LineColor "$LineChars"
+        done
+    fi
+
+    PrintMsg normal "\n"
+    PrintMsg normal " "
+    PrintMsg red "$2"
+    PrintMsg normal " "
+    PrintMsg blue "\t=[ "
+    PrintMsg normal "STAGE "
+    PrintMsg yellow "$1"
+    PrintMsg blue   " ]=\t "
+    PrintMsg normal "\t NAME "
+    PrintMsg yellow "$3"
+    PrintMsg normal "\n"
+
+}
 function Stage__Pre-Checks {
 
-    StgNum=$1 
+    StgNum=$1 ; Issue="0" ; Stepper=0
+    StgTitle="Check Dependancies"
+    PrintHead $StgNum "start" 
+    
+    ### ########################## check root permission ########################## 
+    SubTitle="root permission"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+    # PrintMsg $ColorGood "OK"
+    # PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
 
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Pre-Checks\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-
-    PrintMsg normal "\nCheck root permission\t"
-    if [ `id -u` -ne 0 ]; then            # Do you have root permission?
-	PrintMsg red "FAIL"
+    if [ `id -u` -ne 0 ]
+    then            # Do you have root permission?
+	    PrintMsg $ColorFail "FAIL" 
+        let Issue=$Issue+1
         return 11
     else
-	PrintMsg blue "OK"
+	    PrintMsg $ColorGood "OK"
     fi
 
-    PrintMsg normal "\nCheck Linux disto.\t"
+    ########################## check linux distro ########################## 
+    let Stepper=$Stepper+1
+        printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+        printf '%s %-35.35s | '   $color_normal "Linux disttribution"
+
     if [ `uname -a | grep -i "debian" | wc -l` -lt 1 ]    # Is this Dedian ?
     then
-	PrintMsg red "FAIL"
-	PrintMsg normal "\tBuilt using deb like, ubuntu or kali. This seems different."
+    	PrintMsg $ColorFail "FAIL"
+    	PrintMsg normal "\tBuilt using deb like, ubuntu or kali. This seems different."
+        let Issue=$Issue+1
         return 19
     else
-	PrintMsg blue "OK"
-	PrintMsg normal "\tDebian looks good - any flavour may do."
+	    PrintMsg $ColorGood "OK"
     fi
 
-    PrintMsg normal "\nCheck Kickstart details\t"
+    ########################## valid kickstart files  ########################## 
+    let Stepper=$Stepper+1
+        printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+        printf '%s %-35.35s | '   $color_normal "Kickstart details"
+
     if [ `find $MyDir -type f -name "Host_Config*" | wc -l` -lt 1 ]         # Are there a minimum of one host definitions ?
     then
-	PrintMsg red "FAIL"
+    	PrintMsg $ColorFail "FAIL" 
         PrintMsg normal "\tNo kickstart definitions found to build."
+        let Issue=$Issue+1
         return 12
     else
-	KickSFiles=`ls -1 $MyDir/ | grep "Host_Config" | wc -l`
-	PrintMsg blue "OK"
-        PrintMsg normal "\tFound: $KickSFiles x ACR host."
+	    PrintMsg $ColorGood "OK"
     fi
     
-    PrintMsg normal "\nCheck Dependencies\t"
+    ########################## software dependancies  ########################## 
     Deplist="genisoimage mount rsync"
     for DEP in $DepList
     do
+        let Stepper=$Stepper+1
+            printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+            printf '%s %-35.35s | '   $color_normal "SW package $DEP"
+
         which $DEP &>/dev/null
         if [ $? -ne 0 ]
         then
-            PrintMsg red "FAIL"
+            PrintMsg $ColorFail "FAIL"
             PrintMsg normal "\t$DEP: not installed"
+            let Issue=$Issue+1
             return 15
+        else
+	        PrintMsg $ColorGood "OK"
         fi
     done
-    PrintMsg blue "OK"
-    PrintMsg normal "\t$DepList"
-    PrintMsg normal "\n"
 
-    PrintMsg normal "Check Working Dir Exist\t"
-    for Dir in $WorkMain $WorkRHEL $WorkAcrSw $WorkAcrPatch $WorkAcrKickstart
+    ########################## Directory Access ########################## 
+    for Dir in $WorkMain $WorkRHEL $WorkAcrSw $WorkAcrPatch $WorkAcrKickstart $WorkAcrTools
     do
-        [ -d $Dir ] || mkdir -p $Dir
+        Short=`echo $Dir | sed -e 's/\//\n/g' | tail -1` 2>/dev/null
 
-        if [ -d $Dir ]
+        let Stepper=$Stepper+1
+            printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+            printf '%s %-35.35s | '   $color_normal "$Short Accessable"
+
+        [ -d $Dir ] || mkdir -p $Dir &>/dev/null 
+
+        if [ -d $Dir ] &>/dev/null 
         then
             chown root $Dir &>/dev/null
             chmod u+r,u+w,u+x $Dir &>/dev/null
-	else
-            PrintMsg red "FAIL"
+	        PrintMsg $ColorGood "OK"
+        else
+            PrintMsg $ColorFail "FAIL"; let Issue=$Issue+1
             PrintMsg normal "\t$Directory issue with: $Dir"
             return 15
         fi
     done
-    PrintMsg blue "OK"
-    PrintMsg normal "\n"
 
-    PrintMsg normal "Check Workdir clean\t"
-    PrintMsg blue "..."
 
-    for Dir in $WorkRHEL $WorkAcrSw $WorkAcrPatch $WorkAcrKickstart
+    ########################## Directory Empty ########################## 
+    for Dir in $WorkRHEL $WorkAcrSw $WorkAcrKickstart $WorkAcrTools     # $WorkAcrPatch 
     do
-        PrintMsg normal "\n\t$Dir\t"
+        Short=`echo $Dir | sed -e 's/\//\n/g' | tail -1` 2>/dev/null
+    
+        let Stepper=$Stepper+1
+            printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+            printf '%s %-35.35s | '   $color_normal "$Short Empty"
+
         if [ -d $Dir ]
         then
-            if [ `find $Dir  -maxdepth 2 -type f 2>/dev/null | wc -l` -gt 0 ] 2>/dev/null
-	    then
-                PrintMsg yellow "WARN"
-                PrintMsg normal "\tNot empty, is this acceptable ? "
-                # PrintMsg yellow "[ C "
-                # PrintMsg red "cleanup now"
-                # PrintMsg yellow " ]  or  [ A "
-                # PrintMsg green " accept not empty"
-                # PrintMsg yellow " ] ? "
-		# read CleanOrAccept
-		# if [ `echo $CleanOrAccept | grep -i c | wc -l` -eq 1 ] && [ -d $Dir ]
-		# then
-                #       PrintMsg normal "\nCleaning now\t"
-		# 	rm -rf $Dir &>/dev/null
-		# 	mkdir -p $Dir &>/dev/null
-		# 	chown root $Dir &>/dev/null
-    		#       chmod u+r,u+w,u+x $Dir &>/dev/null
-		# fi
-                # PrintMsg normal "\n"
-	    fi
-	else
-            PrintMsg red "FAIL"
-            PrintMsg normal "\tError checking."
+            rmdir $Dir 2>/dev/null
+            
+            if [ $? -gt 0 ] 2>/dev/null
+            # if [ `find $Dir  -maxdepth 2 -type f 2>/dev/null | wc -l` -gt 0 ] 2>/dev/null
+    	    then
+                let Issue=$Issue+1
+                PrintMsg yellow "warning"
+                PrintMsg normal "\t$Short not empty."
+            else
+                PrintMsg $ColorGood "OK"
+	        fi
+	    else
+            PrintMsg $ColorFail "FAIL"
+            PrintMsg normal "\tError checking $Short."
             return 15
         fi
-    done
-    PrintMsg normal "\nCheck Workdir clean\t"
-    PrintMsg blue "OK"
-    PrintMsg normal "\n"
+        
+        mkdir $Dir 2>/dev/null
 
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
+    done
+
+    #PrintMsg normal "\n\n==[ " && PrintMsg blue "Stage" &&  PrintMsg yellow "$StgNum" && PrintMsg normal " ]=========[\t" && PrintMsg red "\t$StgTitle" && PrintMsg normal "\t]==\n\n"
+
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
+
+}
+
+function Check_Issue_Mode {
+
+    Issue=$1
+    StgNum=$2
+
+    
+
+    if [ $Confirm_Wait_Auto = "auto" ] && [ $Issue -ne 0 ] 
+    then
+        PrintMsg normal "\n"; PrintMsg yellow " WARNING "; PrintMsg normal "\t"
+        PrintMsg blue   " ignore and continue ? "
+        PrintMsg normal "\t"; PrintMsg yellow " WARNING "; PrintMsg normal "\t"
+        PrintMsg normal "[ Mode : " ; PrintMsg blue   "AUTO" ; PrintMsg normal " ]"
+        read; PrintMsg normal "\n"
+    elif [ $Confirm_Wait_Auto = "wait" ]
+    then
+        if [ $Issue -ne 0 ]  
+        then
+            PrintMsg normal "\n"; PrintMsg yellow " WARNING "; PrintMsg normal "\t"
+            PrintMsg blue   " ignore and continue ? "
+            PrintMsg normal "\t"; PrintMsg yellow " WARNING "; PrintMsg normal "\t"
+            PrintMsg normal "[ Mode : " ; PrintMsg blue   "WAIT" ; PrintMsg normal " ]"
+            read; PrintMsg normal "\n"
+        else
+            PrintMsg normal "\n";  PrintMsg normal "\t"
+            PrintMsg blue   " Waiting $TimeOUT sec ... "
+            PrintMsg normal "\t" PrintMsg normal "\t"
+            PrintMsg normal "[ Mode : " ; PrintMsg blue   "WAIT" ; PrintMsg normal " ]"
+            sleep $TimeOUT 
+            PrintMsg normal "\n"
+        fi
+    elif [ $Confirm_Wait_Auto = "confirm" ]
+    then
+            PrintMsg normal "\n"; PrintMsg normal "\t"
+            PrintMsg blue   " Continue ? "
+            PrintMsg normal "\t"; PrintMsg normal "\t"
+            PrintMsg normal "[ Mode : " ; PrintMsg blue   "CONFIRM" ; PrintMsg normal " ]"
+            read; PrintMsg normal "\n"
+    else
+            PrintMsg normal "\n"; PrintMsg normal "\t"
+            PrintMsg blue   " All OK.  Go-Go-Go  ... "
+            PrintMsg normal "\t"; PrintMsg normal "\t"
+            PrintMsg normal "[ Mode : " ; PrintMsg blue   "AUTO" ; PrintMsg normal " ]"
+            sleep 1; PrintMsg normal "\n"
+    fi
+
+    echo $StgNum > $StageTrackPrefix
     return 0
 }
 
 function Stage__Mount {
 
-    StgNum=$1
+    StgNum=$1 ; Issue="0" ; Stepper=0
+   
+    StgTitle="Everything mount-related"
+    PrintHead $StgNum "start" $StgTitle
 
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Mount\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    ########################## RHEL iso file ########################## 
 
-    PrintMsg normal "\nCheck Red Hat iso file\t"
+    let Stepper=$Stepper+1
+        printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+        printf '%s %-35.35s | '   $color_normal "RHEL iso file"
+    ### PrintMsg $ColorGood "OK" #  $ColorFail "FAIL"; let Issue=$Issue+1
+
     Rhl_Iso=`grep "RHEL_ISO_File" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
     if [ `ls $Rhl_Iso 2>/dev/null | wc -l` -gt 0 ]
     then
-	PrintMsg blue "OK"
-        PrintMsg normal "\tISO: $Rhl_Iso"
+        PrintMsg $ColorGood "OK"
     else
-	PrintMsg red "FAIL"
+        $ColorFail "FAIL"; let Issue=$Issue+1
         PrintMsg normal "\tNot usable: $Rhl_Iso"
 	return 13
     fi
 
-    PrintMsg normal "\nCheck ACR iso file\t"
+
+########################## ACR iso file ########################## 
+
+    let Stepper=$Stepper+1
+        printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+        printf '%s %-35.35s | '   $color_normal "ACR iso file"
     ACR_Iso=`grep "ACR_ISO_File" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=`
     if [ `ls $ACR_Iso 2>/dev/null | wc -l` -gt 0 ]
     then
-	PrintMsg blue "OK"
-        PrintMsg normal "\tISO: $ACR_Iso"
+        PrintMsg $ColorGood "OK" 
     else
-	PrintMsg red "FAIL"
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
         PrintMsg normal "\tNot usable: $ACR_Iso"
 	return 14
     fi
 
-    PrintMsg normal "\nCheck RHEL mount dir\t"
+
+########################## RHEL mountpoint ########################## 
+
+    let Stepper=$Stepper+1
+        printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+        printf '%s %-35.35s | '   $color_normal "RHEL mountpoint"
     Rhl_Mnt=`grep "RHEL_ISO_Mount" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
     [ -d $Rhl_Mnt ] || mkdir -p $Rhl_Mnt
     mountpoint -q $Rhl_Mnt && umount $Rhl_Mnt
@@ -231,164 +355,276 @@ function Stage__Mount {
     mountpoint -q $Rhl_Mnt
     if [ $? -ne 0 ] && [ -d $Rhl_Mnt ]
     then
-	    PrintMsg blue "OK"
-            PrintMsg normal "\tDir: $Rhl_Mnt"
+        PrintMsg $ColorGood "OK" 
     else
-            PrintMsg red "FAIL"
-            PrintMsg normal "\tCheck: $Rhl_Mnt"
-            return 21
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+        PrintMsg normal "\tCheck: $Rhl_Mnt"
+        return 21
     fi
 
-    PrintMsg normal "\nCheck ACR mount dir\t"
+
+########################## ACR mountpoint ########################## 
+
+    let Stepper=$Stepper+1
+        printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+        printf '%s %-35.35s | '   $color_normal "ACR mountpoint"
     ACR_Mnt=`grep "ACR_ISO_Mount" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
     [ -d $ACR_Mnt ] || mkdir -p $ACR_Mnt
     mountpoint -q $ACR_Mnt && umount $ACR_Mnt
 
+    Rhl_Mnt=`grep "RHEL_ISO_Mount" $MyDir/template/$DefaultsFile | cut -f2 -d \: | cut -f2 -d \=` 
     mountpoint -q $ACR_Mnt
     if [ $? -ne 0 ] && [ -d $ACR_Mnt ]
     then
-	    PrintMsg blue "OK"
-            PrintMsg normal "\tDir: $ACR_Mnt"
+        PrintMsg $ColorGood "OK" 
     else
-            PrintMsg red "FAIL"
-            PrintMsg normal "\tCheck: $ACR_Mnt"
-            return 22
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+        PrintMsg normal "\tCheck: $ACR_Mnt"
+        return 22
     fi
 
-    PrintMsg normal "\nMount RHEL iso loop\t"
+
+########################## mounting RHEL ########################## 
+
+    let Stepper=$Stepper+1
+        printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+        printf '%s %-35.35s | '   $color_normal "mounting RHEL"
     mount -o ro,loop $Rhl_Iso $Rhl_Mnt 
     mountpoint -q $Rhl_Mnt
     if [ $? -eq 0 ]
     then
-	    PrintMsg blue "OK"
-            PrintMsg normal "\t`df -h $Rhl_Mnt | tail -1 | awk '{print $6}'`"
+        PrintMsg $ColorGood "OK"
     else
-            PrintMsg red "FAIL"
-            PrintMsg normal "\tCould not mount \"$Rhl_Iso\" on \"$Rhl_Mnt\""
-            return 23
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+        PrintMsg normal "\tCould not mount \"$Rhl_Iso\" on \"$Rhl_Mnt\""
+        return 23
     fi
 
-    PrintMsg normal "\nMount ACR iso loop\t"
+
+########################## mounting ACR ########################## 
+
+    let Stepper=$Stepper+1
+        printf '%s\n   %-3.3s | ' $color_blue   "$Stepper"
+        printf '%s %-35.35s | '   $color_normal "mounting ACR"
     mount -o ro,loop $ACR_Iso $ACR_Mnt
     mountpoint -q $ACR_Mnt
     if [ $? -eq 0 ]
     then
-	    PrintMsg blue "OK"
-            PrintMsg normal "\t`df -h $ACR_Mnt | tail -1 | awk '{print $6}'`"
+        PrintMsg $ColorGood "OK" 
     else
-            PrintMsg red "FAIL"
-            PrintMsg normal "\tCould not mount \"$ACR_Iso\" on \"$ACR_Mnt\""
-            return 23
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+        PrintMsg normal "\tCould not mount \"$ACR_Iso\" on \"$ACR_Mnt\""
+        return 23
     fi
 
-    PrintMsg normal "\n"
+    # PrintMsg normal "\n\n==[ " && PrintMsg blue "Stage" &&  PrintMsg yellow "$StgNum" && PrintMsg normal " ]=========[\t" && PrintMsg red "\t$StgTitle" && PrintMsg normal "\t]==\n\n"
 
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    return 0
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
+
 }
 
 function Stage__CopyIso {
 
-    StgNum=$1
+    StgNum=$1 ; Issue="0" ; Stepper=0
+    StgTitle="Extract required from rhel iso" 
+    PrintHead $StgNum "start" $StgTitle
 
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Copy ISO\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    ########################## check root permission ########################## 
+    SubTitle="rsync rhel iso target"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+    # PrintMsg $ColorGood "OK"
+    # PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
 
-    PrintMsg normal "\nRun copy RHEL \t"
     SizeRhelWork=`du -sk $WorkRHEL | awk '{print $1}'`
     if [ $SizeRhelWork -gt 2600000 ] # Usually 4054996
     then		
-	PrintMsg blue "OK"
-        PrintMsg normal "\tPreviously copied, or clean before this ... dir:`du -sh $WorkRHEL/.`"
         umount $Rhl_Mnt
+        PrintMsg $ColorGood "OK"
     else
         mountpoint -q $Rhl_Mnt
         if [ $? -eq 0 ] && [ -d $WorkRHEL ]
         then
-            PrintMsg blue "...\n"
-            rsync --progress --update -az $Rhl_Mnt/* $WorkRHEL/.
-    	if [ $? -eq 0 ]
+                {
+                    rsync -az $Rhl_Mnt/* $WorkRHEL/. 
+                    ExCoRsync=$?
+
+                }&>/tmp/.rsync.rhel.$$.log
+
+    	    if [ $ExCoRsync -eq 0 ]
             then
-            PrintMsg normal "\n ... copy RHEL ...\t"
-	        PrintMsg blue "OK"
-                PrintMsg normal "\tDone  iso:`du -sh $Rhl_Mnt/.` Dir:`du -sh $WorkRHEL/.`"
-	        umount $Rhl_Mnt
+	            umount $Rhl_Mnt
+                PrintMsg $ColorGood "OK"
             else
-                PrintMsg red "FAIL"
-                PrintMsg normal "\tExit code indicates error."
+                PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+                PrintMsg normal "\tcheck: /tmp/.rsync.rhel.$$.log"
                 return 31
             fi
         else
-            PrintMsg red "FAIL"
+            PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
             PrintMsg normal "\tDir \"$WorkRHEL\" or mountpoint \"$Rhl_Mnt\" invalid."
             return 32
         fi
     fi
 
-    PrintMsg normal "\nSlimming - del KDE \t"
-    SizeBefore=`du -sh $WorkRHEL/. | awk '{print $1}'`
-    find $WorkRHEL/Packages/ -iname "*kde*.rpm" --exec rm -f '{}' \; 2>/dev/null
-    SizeAfter=`du -sh $WorkRHEL/. | awk '{print $1}'`
-    PrintMsg blue "OK"
-    PrintMsg normal "\tDone:   Was [ $SizeBefore ]   Now [ $SizeAfter ]"
 
-    PrintMsg normal "\n"
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    return 0
+########################## rem kde to slimming iso ########################## 
+
+    SubTitle="rem kde to slimming iso"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+        {
+            Removed=`find $WorkRHEL/Packages/. -type f -iname "*kde*.rpm" -exec rm -vf '{}' \; | wc -l`
+            ExCdRemoveKde=$?
+
+        }&>/tmp/.rm.find.$$.log
+
+    if [ $Removed -gt 50 ] && [ $ExCdRemoveKde -eq 0 ]
+    then
+        PrintMsg $ColorGood "OK"
+    else
+        PrintMsg $ColorFail "warning"# ; let Issue=$Issue+1
+        PrintMsg normal "\tNo kde files to clean"
+    fi
+
+    # PrintMsg normal "\n\n==[ " && PrintMsg blue "Stage" &&  PrintMsg yellow "$StgNum" && PrintMsg normal " ]=========[\t" && PrintMsg red "\t$StgTitle" && PrintMsg normal "\t]==\n\n"
+
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
+
 }
 
 function Stage__CopyACR {
 
-    StgNum=$1
+    InstallerDirInWitness="install" 
 
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Copy ACR ISO\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    StgNum=$1 ; Issue="0" ; Stepper=0
 
-    PrintMsg normal "\nRun copy ACR now\t"
-    Got_ACR=`find $WorkAcrSw/. -type f -iname "*.rpm" | grep -i \/acr | wc -l`
-    Got_Postgres=`find $WorkAcrSw/. -type f -iname "*.r" | grep -i \/postgres | wc -l`
-    Got_Tomcat=`find $WorkAcrSw/. -type f -iname "*.r" | grep -i \/tomcat | wc -l`
-    Got_Java=`find $WorkAcrSw/. -type f -iname "*.r" | grep -i \/jdk | wc -l`
-    Got_Html=`find $WorkAcrSw/. -type f -iname "*.htm*" | wc -l`
+    StgTitle="Extract software from ACR iso"
+    PrintHead $StgNum "start" 
+    NeedaNewCopy="n"
 
-    if [ $Got_ACR -ge 1 ] &&  [ $Got_Postgres -ge 1 ] && [ $Got_Tomcat -ge 1 ] && [ $Got_Java -ge 1 ] && [ $Got_Html -ge 1 ]
-    then
-	PrintMsg blue "OK"
-        PrintMsg normal "\tFound all required installers."
-        umount $ACR_Mnt
-    else
-        mountpoint -q $ACR_Mnt
-        if [ $? -eq 0 ] && [ -d $WorkAcrSw ]
+    ############################# Installer Directory ########################## 
+
+        SubTitle="Installer Directory"
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+        
+        [ -d $WorkAcrSw/$InstallerDirInWitness ] || mkdir -p $WorkAcrSw/$InstallerDirInWitness 
+        if [ $? -eq 0 ]
         then
-            VeryfyCopy=0
-            find  $ACR_Mnt -type f -iname "*.jar"  -exec cp '{}' $WorkAcrSw/. \; || let VeryfyCopy=$VeryfyCopy+1
-            find  $ACR_Mnt -type f -iname "*.rpm"  -exec cp '{}' $WorkAcrSw/. \; || let VeryfyCopy=$VeryfyCopy+1
-            find  $ACR_Mnt -type f -iname "*.run"  -exec cp '{}' $WorkAcrSw/. \; || let VeryfyCopy=$VeryfyCopy+1
-            find  $ACR_Mnt -type f -iname "*.html" -exec cp '{}' $WorkAcrSw/. \; || let VeryfyCopy=$VeryfyCopy+1
-
-	    if [ $VeryfyCopy -eq 0 ]
-            then
-	        PrintMsg blue "OK"
-                PrintMsg normal "\tCopied all required installers."
-	        umount $ACR_Mnt
-            else
-                PrintMsg red "FAIL"
-                PrintMsg normal "\tExit code indicates error."
-                return 31
-            fi
+            PrintMsg $ColorGood "OK"
         else
-            PrintMsg red "FAIL"
-            PrintMsg normal "\tDir \"$WorkAcrSw\" or mountpoint \"$ACR_Mnt\" invalid."
-            return 32
+            PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+            PrintMsg normal "\tIssue with \"$WorkAcrSw/$InstallerDirInWitness\""
+            return 23
         fi
-    fi
 
-    PrintMsg normal "\n"
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    return 0
+        SubTitle="Verify ACR packages"
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+        if [ `find $WorkAcrSw/. -type f -iname "*.rpm" | grep -i \/acr | wc -l` -ge 1 ]
+        then
+            PrintMsg $ColorGood "OK"
+        else
+            PrintMsg yellow "warning"
+            PrintMsg normal "\tWill have to copy a new set"
+            NeedaNewCopy="y"
+        fi
+
+        SubTitle="Verify Postgres packages"
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+        if [ `find $WorkAcrSw/. -type f -iname "*.r" | grep -i \/postgres | wc -l` -ge 1 ]
+        then
+            PrintMsg $ColorGood "OK"
+        else
+            PrintMsg yellow "warning"
+            PrintMsg normal "\tWill have to copy a new set"
+            NeedaNewCopy="y"
+        fi
+
+        SubTitle="Verify Tomcat packages"
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+        if [ `find $WorkAcrSw/. -type f -iname "*.r" | grep -i \/tomcat | wc -l` -ge 1 ]
+        then
+            PrintMsg $ColorGood "OK"
+        else
+            PrintMsg yellow "warning"
+            PrintMsg normal "\tWill have to copy a new set"
+            NeedaNewCopy="y"
+        fi
+
+        SubTitle="Verify Java packages"
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+        if [ `find $WorkAcrSw/. -type f -iname "*.r" | grep -i \/jdk | wc -l` -ge 1 ]
+        then
+            PrintMsg $ColorGood "OK"
+        else
+            PrintMsg yellow "warning"
+            PrintMsg normal "\tWill have to copy a new set"
+            NeedaNewCopy="y"
+        fi
+
+        if [ $NeedaNewCopy = "y" ]
+        then
+
+            mountpoint -q $ACR_Mnt
+            if [ $? -eq 0 ] && [ -d $WorkAcrSw ]
+            then
+                SubTitle="Copy .jar installer"
+                let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+                {
+                    find $ACR_Mnt -type f -iname "*.jar"  -exec cp -f '{}' $WorkAcrSw/$InstallerDirInWitness/. \;  
+                }&>/tmp/.acr.copy.$$.log
+                if [ $? -eq 0 ]
+                then
+                    PrintMsg $ColorGood "OK"
+                else
+                    PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+                fi
+
+                SubTitle="Copy .rpm installer"
+                let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+                {
+                    find  $ACR_Mnt -type f -iname "*.rpm"  -exec cp '{}' $WorkAcrSw/$InstallerDirInWitness/. \;
+                }&>/tmp/.acr.copy.$$.log
+                if [ $? -eq 0 ]
+                then
+                    PrintMsg $ColorGood "OK"
+                else
+                    PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+                fi
+
+                SubTitle="Copy .run installer"
+                let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+                {
+                    find  $ACR_Mnt -type f -iname "*.run"  -exec cp '{}' $WorkAcrSw/$InstallerDirInWitness/. \; 
+                }&>/tmp/.acr.copy.$$.log
+                if [ $? -eq 0 ]
+                then
+                    PrintMsg $ColorGood "OK"
+                else
+                    PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+                fi
+
+                SubTitle="Copy .html release note"
+                let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+                {
+                    find  $ACR_Mnt -type f -iname "*.html" -exec cp '{}' $WorkAcrSw/$InstallerDirInWitness/. \; 
+                }&>/tmp/.acr.copy.$$.log
+                if [ $? -eq 0 ]
+                then
+                    PrintMsg $ColorGood "OK"
+                else
+                    PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+                fi
+
+            fi
+
+        fi
+
+    # PrintMsg normal "\n\n==[ " && PrintMsg blue "Stage" &&  PrintMsg yellow "$StgNum" && PrintMsg normal " ]=========[\t" && PrintMsg red "\t$StgTitle" && PrintMsg normal "\t]==\n\n"
+
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
+
 }
 
 function CheckLEN { # checks if it has some characters
@@ -400,10 +636,15 @@ function CheckLEN { # checks if it has some characters
 
 function Stage__Kickstarts {
 
-    StgNum=$1
+    StgNum=$1 ; Issue="0" ; Stepper=0
+    StgTitle="Check Dependancies"
+    PrintHead $StgNum "start" 
 
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Generate ks.cfg\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    SubTitle="root permission"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+    # PrintMsg $ColorGood "OK"
+    # PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+
 
     PrintMsg normal "\nRecorder template\t"
     TemplateNormalACR=$MyDir"/template/kickstart-acr.template"
@@ -435,7 +676,6 @@ function Stage__Kickstarts {
     for Host in `ls -1 ${MyDir}/Host_Config*`
     do
         PrintMsg normal "\t`echo $Host | sed -e 's/\.\///g'`\t"
-        
 	# Keep_Calls
         HostKeepCalls=`grep \:Keep_Calls $Host | cut -f2 -d \=` ; CheckLEN $HostKeepCalls || return $STG
        	[ $DEBUG = "true" ] && PrintMsg $ColDBG "\nDEBUG\tKeepCalls : $HostKeepCalls"
@@ -587,21 +827,21 @@ function Stage__Kickstarts {
     PrintMsg normal "\n"
 
     echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
+    PrintMsg $ColorStage "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
+    PrintMsg normal "\n"
     return 0
 
 # CRS_Layout
 
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
 }
 
 function Stage__ISOLUNUX {
 
     StgNum=$1
 
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "RHEL Menu\n"
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-
-    # HostCust
+    PrintHead $StgNum "start" 
 
     PrintMsg normal "\nCheck isolinux template\t"
 
@@ -749,7 +989,7 @@ function Stage__ISOLUNUX {
 	    PrintMsg red "\nexit now." ; PrintMsg normal "\n"
 	    exit 1
     fi
-    PrintMsg yellow "\nAccept ? [y/n] "
+    PrintMsg $ColorStage "\nAccept ? [y/n] "
     # read ConfIso
     ConfIso="y"
     PrintMsg normal "\n\tAssume \"y\"\n" ; sleep 3
@@ -759,49 +999,101 @@ function Stage__ISOLUNUX {
 	    && cat $TemplateTMPISODefault > ${WorkRHEL}/isolinux/isolinux.cfg
     [ $? -ne 0 ] && exit 1
 
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    return 0
+    # PrintMsg normal "\n\n==[ " && PrintMsg blue "Stage" &&  PrintMsg yellow "$StgNum" && PrintMsg normal " ]=========[\t" && PrintMsg red "\t$StgTitle" && PrintMsg normal "\t]==\n\n"
+
+    PrintHead $StgNum "ended" $StgTitle
+    let Issue=$Issue+1     # A break to manually update files #
+    Check_Issue_Mode $Issue "A break to manually update files"
 
 }
 
 function Stage__ACRPatches {
 
-    StgNum=$1
+    StgNum=$1 ; Issue="0" ; Stepper=0
+    StgTitle="ACR Patches"
+    PrintHead $StgNum "start" 
+    PatchDirInWitness="patches"
 
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Patch Collection\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    SubTitle="Collect acr-patched"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+    [ -d $WorkAcrSw/$PatchDirInWitness ] || mkdir -p $WorkAcrSw/$PatchDirInWitness 
+    [ -d $WorkAcrSw/$PatchDirInWitness ] && cp -r $WorkAcrPatch/* $WorkAcrSw/$PatchDirInWitness/.
 
-# ACR_Patch_Dir
+    if [ $? -ne 0 ]
+    then
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+    else
+        PrintMsg $ColorGood "OK"
+    fi
 
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    return 0
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
+
 }
 
 function Stage__ACRTools {
 
+    StgNum=$1 ; Issue="0" ; Stepper=0
+    StgTitle="Check Dependancies"
+    PrintHead $StgNum "start" 
+    
+### ########################## check root permission ########################## 
+    SubTitle="root permission"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+    # PrintMsg $ColorGood "OK"
+    # PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+## sample
     StgNum=$1
 
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "acr-tools\n"
+    PrintMsg $ColorStage "\nStage $StgNum start\t" ; PrintMsg normal "acr-tools\n"
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
-# ACR_TOOLS
+    PrintMsg normal "\nCollect acr-tools ...\n"
 
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    return 0
+    CurDir=`pwd -P`
+    cd $WorkAcrTools \
+	    && wget -O master.$$.zip $AcrTools_Url \
+	    && unzip master.$$.zip \
+	    && rm -f  master.$$.zip \
+	    && tar -cvzf $WorkRHEL/acr-tools.tgz acr-tools-master \
+	    && cd $WorkRHEL/ \
+	    && sha1sum acr-tools.tgz | tee acr-tools.tgz.`date +%F`.sha1sum.txt 
+
+        PrintMsg normal "\nCollect acr-tools\t"
+	PrintMsg blue "OK" 
+        PrintMsg normal "\t`sha1sum -c acr-tools.tgz.`date +%F`.sha1sum.txt`"
+
+    cd $CurDir
+
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
+
 }
 
 function Stage__Combiner {
 
+### sample y9j
+    StgNum=$1 ; Issue="0" ; Stepper=0
+    StgTitle="Combine everyting"
+    PrintHead $StgNum "start" 
+    
+    PatchDirInWitness="patches"
+    InstallerDirInWitness="install" 
+
+### ########################## check root permission ########################## 
+    SubTitle="root permission"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+    # PrintMsg $ColorGood "OK"
+    # PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+## sample
     StgNum=$1
 
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Combiner\n"
+    PrintMsg $ColorStage "\nStage $StgNum start\t" ; PrintMsg normal "Combiner\n"
     echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
 
+    echo $WorkAcrPatch
     CurDir=`pwd -P`
-    IsoArchSoftware="acr-softfare.tgz"
+    IsoArchSoftware="acr-software.tgz"
 
     PrintMsg normal "\nPrepare dir ISO/$IsoDirSoftware\t"
 
@@ -810,9 +1102,11 @@ function Stage__Combiner {
    then
        ArchGood="1" # assume no
        {
-           /bin/tar -cvzf $WorkRHEL/$IsoArchSoftware * && ArchGood="0"
+           /bin/tar -cvzf $WorkRHEL/$IsoArchSoftware $PatchDirInWitness $InstallerDirInWitness
+           ArchGood="0"
 
-       }&>$WorkRHEL/$IsoArchSoftware.`date +%F`.txt
+       }&>/tmp/.tar.comvine.$$.log
+
        if [ $ArchGood -eq 0 ]
        then
            cd $WorkRHEL/  &&  sha1sum $IsoArchSoftware > $IsoArchSoftware".sha1sum.txt" 
@@ -821,7 +1115,7 @@ function Stage__Combiner {
            then
                PrintMsg blue "OK" 
            else
-               PrintMsg red "FAIL"
+#           /tmp/.tar.comvine.$$.log    PrintMsg red "FAIL"
 	       return 87
            fi
        else 
@@ -834,61 +1128,74 @@ function Stage__Combiner {
    fi
    cd $CurrDir
 
-    PrintMsg normal "\n"
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    return 0
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
+
 }
 
 function Stage__GenISOImage {
 
-    StgNum=$1
-
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Gen-ISO\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    StgNum=$1 ; Issue="0" ; Stepper=0
+    StgTitle="Generate ISO"
+    PrintHead $StgNum "start" 
     
-    PrintMsg normal "\nGenerate ISO\t"
+### ########################## check root permission ########################## 
+    SubTitle="geniso"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+    # PrintMsg $ColorGood "OK"
+    # PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
 
     cd $WorkRHEL
 
-    PrintMsg yellow "\nGenerate ISO  ? [y/n] " 
-    read ConfGen # 
-    PrintMsg normal "\n"
-    ConfGen="y" ; PrintMsg normal " ... assume \"yes\"\n" ; sleep 3
-    [ $ConfGen = "y" ] || exit 22
-
-    [ -f $WorkMain/$IsoLabel.iso ] && rm -f $WorkMain/$IsoLabel.iso &>/dev/null
-
-    genisoimage -o $WorkMain/$IsoLabel.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot \
-	        -V $IsoLabel -boot-load-size 4 -boot-info-table -R -J -v -T ./ 
-
-    if [ $? -eq 0 ]
+    if [ $Confirm_Wait_Auto = "auto" ] 
     then
-          PrintMsg blue "OK" 
+        ConfGen="y" 
     else
-          PrintMsg red "FAIL"
-	  return 87
+        PrintMsg $ColorStage "\nGenerate ISO  ? [y/n] "
+        read ConfGen # 
     fi
 
-    PrintMsg normal "\n"
+    [ $ConfGen = "y" ] || exit 22
 
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    return 0
+        {
+            [ -f $WorkMain/$IsoLabel.iso ] && rm -f $WorkMain/$IsoLabel.iso 
+
+            genisoimage -o $WorkMain/$IsoLabel.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot \
+                -V $IsoLabel -boot-load-size 4 -boot-info-table -R -J -v -T ./ 
+            
+            ExCoGen=$?
+
+        }&>/tmp/.geniso.&&.log
+
+    if [ $ExCoGen -eq 0 ]
+    then
+        PrintMsg $ColorGood "OK"
+    else
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+        PrintMsg normal "\tcheck: /tmp/.geniso.&&.log"
+        return 87
+    fi
+
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
+
 }
 
 function Stage__Cleanup {
 
-    StgNum=$1
-    PrintMsg yellow "\n\nISO\t$WorkMain/$IsoLabel.iso\n"
-    PrintMsg normal "\nDONE\n\n"
-    exit 0
-    PrintMsg yellow "\nStage $StgNum start\t" ; PrintMsg normal "Cleanup\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
+    StgNum=$1 ; Issue="0" ; Stepper=0
+    StgTitle="Cleanup" ; PrintHead $StgNum "start" $StgTitle
 
-    echo "S"$StgNum":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-    PrintMsg yellow "\nStage $StgNum end\t" ; PrintMsg red "\tsleeping $TimeOUT ... [Ctrl-C to stop]" ; sleep $TimeOUT
-    return 0
+# ########################## ? ########################## 
+# SubTitle="root permission"
+# let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+# PrintMsg $ColorGood "OK"
+# PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+# ########################## ? ########################## 
+
+    PrintHead $StgNum "ended" $StgTitle
+    Check_Issue_Mode $Issue $StgNum
+
 }
 
 function ErrorStatus {
@@ -911,15 +1218,13 @@ function CleanDirs {
 
 	AllClean="no"
 
-        for DirToClean in `find  /root/Desktop/acr-build-ISO-WorkMain/workACR-kickstart /root/Desktop/acr-build-ISO-WorkMain/ -mindepth 1 -maxdepth 1 -type d `
+    for DirToClean in $WorkRHEL $WorkAcrSw $WorkAcrKickstart $WorkAcrTools     # $WorkAcrPatch 
     do
+        Short=`echo $DirToClean | sed -e 's/\//\n/g' | tail -1` 2>/dev/null
 	    if [ $AllClean = "no" ]
 	    then
-	            echo
-		    echo "Clean "$DirToClean" ? (y)es, (n)o, (a)all ? "
+    		    echo "Clean "$Short" ? (y)es, (n)o, (a)all ? "
          	    read CleanAnswer
-	            echo
-
 	            [ $CleanAnswer = "a" ] 2>/dev/null && AllClean="yes"
 	    fi
 
@@ -935,32 +1240,68 @@ function CleanDirs {
     return 0
 }
 
-function Question () {
+function StageList {
+	echo
+}
+function GetLastKnownName {
+
+    StgQ=$1
+    StgNameFile="/tmp/buil_stagelist.txt"
+    StgName=""
+
+    if [ -f $StgNameFile ]
+    then
+        [ `grep ^:$StgQ  $StgNameFile | wc -l` -ge 1 ] \
+            && StgName=`grep ^:$StgQ $StgNameFile | tail -1 | cut -f3 -d \:` \
+            && echo $StgName \
+            && return 0
+    fi
+    echo $StgName
+    return 1
+}
+
+function Question {
+
+    LAST=$1
 
     ValidResponse=1
+    LastStaga="00"
+    if [ $# -gt 0 ] && [ `echo $LAST | wc -c` -gt 1 ]
+    then
+        LastName=`GetLastKnownName $LAST`
+    fi
 
     while [ $ValidResponse -gt 0 ]
     do
-	PrintMsg yellow "\n$0 Options:\n"
-	PrintMsg normal "\n\t["
+
+	PrintMsg green  "\n\tMENU\n"
+	PrintMsg red    "\t\t$0\n"
+	PrintMsg normal "\n\tLast Stage "
+	PrintMsg red    ">> "
+	PrintMsg yellow "$LAST"
+	PrintMsg red    " << "
+	PrintMsg yellow " \"$LastName\" \n"
+    PrintMsg normal "\n\t["
 	PrintMsg yellow " R "
-	PrintMsg normal "] run"
+	PrintMsg normal "] run (default)"
 
 	PrintMsg normal "\n\t["
-	PrintMsg yellow " E "
+	PrintMsg green  " E "
 	PrintMsg normal "] exit"
 
 	PrintMsg normal "\n\t["
-	PrintMsg yellow " C " 
+	PrintMsg green  " C " 
 	PrintMsg normal "] clean working dir"
 
 	PrintMsg normal "\n\t["
-	PrintMsg yellow " S "
+	PrintMsg green  " S "
 	PrintMsg normal "] specify stage"
 
 	PrintMsg normal "\n\t["
-	PrintMsg yellow " N "
-	PrintMsg normal "] next incomplete stage" 
+	PrintMsg green  " N "
+	PrintMsg normal "] next stage ("
+	PrintMsg green "$NextStage"
+	PrintMsg normal ")"
 
 	PrintMsg yellow "\n\n\t? "
 	unset $Option
@@ -990,19 +1331,33 @@ function Question () {
 
 }
 
-#	PrintMsg normal "] YES  or  [" ; PrintMsg yellow "N" ; PrintMsg normal "] NO "
-#	read Answer ; PrintMsg normal "\n"
-#
-#        if [ `echo $Answer | grep -i "y" | wc -l` -ge 1 ] 2>/dev/null
-#	then
-#            return 0
-#        elif [ `echo $Answer | grep -i "n" | wc -l` -ge 1 ] 2>/dev/null
-#	then
-#            return 1
-#        else
-#            return 3
-#        fi
-# for JJ in `find  /root/Desktop/acr-build-ISO-WorkMain/workACR-kickstart /root/Desktop/acr-build-ISO-WorkMain/ -mindepth 1 -maxdepth 1 -type d `; do echo $JJ; rm -rf $JJ ; mkdir -v $JJ;done
+function ListStageUpdate {
+
+	if [ $# -ge 2 ]
+	then
+            StageNumber=$1
+	    if [ $1 -lt 10 ]
+            then
+
+                StageLine=`echo ':0'$1':'$2`
+
+            elif [ $1 -lt 100 ] || [ $1 -ge 10 ]
+	    then
+
+                StageLine=`echo ':'$1':'$2`
+
+            else
+                echo \#' ERROR '`date +%F_%H-%M-%S`' : '$1' : '$2' : '\# | tee -a $StageListFile
+                return 2
+            fi
+
+            echo $StageLine >> $StageListFile 
+            return 0
+        else
+            echo "ERR: ListStageUpdate requires 2 varables, not "$# 
+        fi
+
+}
 
 ############################################################
 
@@ -1012,165 +1367,118 @@ function Question () {
 #  |/|            |/|
 #  |////////////////|
 
+# TEST
+# TEST
 
 DEBUG=false
 #DEBUG="true"
 
-Question
+StageMin="00"
+StageMax="12"
+Sequence=`seq -w $StageMin 1 $StageMax`
+
+LastSTG=`StageProcess_GetLastEnd`
+Question $LastSTG
 Start=$?
 
-if [ $Start -lt 10 ]
+if [ $Start -le 12 ]
 then
-    Now=`echo "0"$Start`
-    Sequence=`seq -w $Now 1 11`
-elif [ $Start -ge 10 ]
-then 
-    Sequence=`seq -w $Start 1 11`
+    Sequence=`seq -w $Now 1 $StageMax`
 else
 	echo "fukup "$Response" "$Sequence
 	exit
 fi
 
+    if [ -f $StageTrackPrefix ] && [ `echo $Sequence | wc -c` -gt 1 ]
+    then
+	rm -f $StageTrackPrefix
+    fi
 
-#StageCurrent="S00"
-#StageLast="S11"
-
-#StageLast=`StageProcess_GetLastEnd` 2>/dev/null || StageLast="S00" ; [ $DEBUG = "true" 2>/dev/null ] && PrintMsg $ColDBG "\nDEBUG\tStageLast returned as $StageLast\n" 
-
-#if [ $StageLast = $StageCurrent ] 2>/dev/null
-#then
-#    StageCurrent="S00"
-#else
-#	Response=`Question`
-#	if [ $? -eq 0 ] 2>/dev/null
-#	then
-#            StageCurrent=`echo $StageLast | sed -e 's/S//g'`
-#            StageCurrent="04"
-#        else
-#            StageCurrent="00"
-#	fi
-#	PrintMsg normal "\n"
-#        rm -f /tmp/.build_iso_stage_tracker_*.tmp 2>/dev/null
-#        echo $StageCurrent":end "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-#fi
-
-
-#while [ $StageCurrent -lt 11 ]
-#do
-    # for STG in `seq -w $StageCurrent 1 11`
     for STG in $Sequence
     do
 
-    # PrintMsg blue "\n================================================================="
-    PrintMsg blue " \n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-    PrintMsg normal "\n"
-
+    echo $STG > $StageTrackPrefix
 
     if [ $STG -eq 00 ] 
     then
-	    echo LLLLLLLLLLLLLLLL
-        Stage__Pre-Checks $STG
-        ErrorStatus $?
+        ListStageUpdate 0 "Pre-Menu"
+        echo "00" > $StageTrackPrefix
     fi
-    if [ $STG -eq 01 ]
+    if [ $STG -eq 01 ] 
     then
-        Stage__Mount $STG
+        ListStageUpdate 1 "Pre-Checks"
+        Stage__Pre-Checks $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 02 ]
     then
-        Stage__CopyIso $STG
+        ListStageUpdate 2 "Mount iso to mountpoint"
+        Stage__Mount $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 03 ]
     then
-        Stage__CopyACR $STG
+        ListStageUpdate 3 "extract rhel"
+        Stage__CopyIso $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 04 ]
     then
-        Stage__Kickstarts $STG
+        ListStageUpdate 4 "acr-software"
+        Stage__CopyACR $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 05 ]
     then
-	Stage__ISOLUNUX $STG
+        ListStageUpdate 5 "kickstart file build"
+        Stage__Kickstarts $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 06 ]
     then
-	Stage__ACRPatches $STG
+        ListStageUpdate 6 "isolinux boot menu build"
+	Stage__ISOLUNUX $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 07 ]
     then
-	Stage__ACRTools $STG
+        ListStageUpdate 7 "acr-patches"
+	Stage__ACRPatches $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 08 ]
     then
-	Stage__Combiner $STG
+        ListStageUpdate 8 "act-tools"
+	Stage__ACRTools $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 09 ]
     then
-	Stage__GenISOImage $STG
+        ListStageUpdate 9 "Merge iso"
+	Stage__Combiner
         ErrorStatus $?
     fi
     if [ $STG -eq 10 ]
     then
-	Stage__Cleanup $STG
+        ListStageUpdate 10 "Generate ISO"
+	Stage__GenISOImage $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 11 ]
     then
+        ListStageUpdate 11 "Post-Cleanup"
+	Stage__Cleanup $STG
+        ErrorStatus $?
+    fi
+    if [ $STG -eq 12 ]
+    then
+        ListStageUpdate 12 "End"
+	echo $STS > $StageTrackPrefix
+	echo "ALL Done"
         exit 0
     fi
 
-#    StageCurrent=`StageProcess_GetLastEnd` 
     done
 
-#done
 
 exit 0
-# if [ -e $Working/target ]; then
-# 	echo "Clean Target?"
-# 	read AA
-# 	if [ $AA = "y" ] || [ $AA = "Y" ];then
-# 		echo YES ; sleep 3
-#                 mountpoint -q $Working/rhel.iso || exit 1
-# 		rm -vrf $Working/target
-#                 rsync --update -avz $Working/rhel.iso/* $Working/target/. && cd $Working/custom && tar -cf - * | tar -xvf - -C $Working/target/
-#         fi
-# fi	
-# rm -v $Working/target/kde*
-# 
-# [ ! -e $Working/target ] && mkdir $Working/target
-# [ -e $Working/custom ] || exit 2
-# if [ -e $Working/custom/ks ]
-# then
-# 	cat $Working/custom/.start.template >  $Working/custom/isolinux/isolinux.cfg 
-#     cd $Working/custom/ks && KS_FILES=`ls -1 *.cfg`
-#     for KS_I in $KS_FILES
-#     do
-#        printf "  \nlabel linux_ks_$KS_I\n"  > /tmp/$$.tmp ;printf "    menu label Install using $KS_I\n" >> /tmp/$$.tmp
-# # 	    cat $Working/custom/.single3.template >> /tmp/$$.tmp
-#        printf "append initrd=initrd.img inst.text inst.ks=hd:LABEL=CUSTOM-RHEL:/ks/$KS_I\n" >> /tmp/$$.tmp
-#        cat /tmp/$$.tmp >> $Working/custom/isolinux/isolinux.cfg && rm /tmp/$$.tmp
-#     done
-#     fi
-# cat $Working/custom/.end.template >> $Working/custom/isolinux/isolinux.cfg
-# [ -e $Working/acr.iso ] && cd $Working/acr.iso && tar -cvzf $Working/target/ACR.tgz *
-# [ -e $Working/CUSTOM-RHEL.iso ] && rm -v $Working/completed.iso 
-# cd $Working/target &&
-#       	genisoimage -o $Working/CUSTOM-RHEL.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -V CUSTOM-RHEL -boot-load-size 4 -boot-info-table -R -J -v -T ./ \
-# 	&& echo done
-# 
-# timezone ___TIMEZONE___ --utc --ntpservers=192.168.0.1
-# ___CLEARPARTLINE___
-# ___PARTLINE_BOOT___
-# ___PARTLINE_WITNESS___
-# ___PARTLINE_PGSQL___
-# ___PARTLINE_SWAP___
-# ___PARTLINE_CALLS___
-#wget http://github.com/johanr89/acr-tools/archive/master.zip
