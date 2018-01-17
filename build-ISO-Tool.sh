@@ -94,6 +94,45 @@ function StageProcess_GetLastEnd {
 
 function PrintHead {
 
+    LineColor="yellow" ; LineChars="-" ; LineLenth="70"
+    MenuColor="red" ; MenuHighColor="yellow" ; MenuTextColor="normal"
+
+    Stge=$1
+    StartOrMode=$2
+    Name=`GetLastKnownName $Stge`
+
+    if [ $StartOrMode = "start" ] 2>/dev/null
+    then
+        # PrintMsg $LineColor "\n"
+        # for LineCount in `seq 1 1 $LineLenth`
+        # do
+        #     PrintMsg $LineColor "$LineChars"
+        # done
+
+        PrintMsg normal "\n"
+
+        PrintMsg $MenuColor     "====="
+        PrintMsg $MenuHighColor "[ "
+        PrintMsg $MenuTextColor "stage $Stge"
+        PrintMsg $MenuHighColor " ]"
+        PrintMsg $MenuColor     "="
+        PrintMsg $MenuColor     "========="
+        PrintMsg $MenuColor     "="
+        PrintMsg $MenuHighColor "[ "
+        printf '%s%20.20s' $color_normal  "$Name"
+        PrintMsg $MenuHighColor " ]"
+        PrintMsg $MenuColor     "====="
+
+        PrintMsg normal "\n"
+    else
+        PrintMsg normal "\n"
+        PrintMsg normal "\n"
+
+    fi
+}
+
+function old_PrintHead {
+
     LineColor="normal" ; LineChars="=" ; LineLenth="70"
 
     Stge=$1
@@ -128,22 +167,11 @@ function PrintHead {
     PrintMsg normal "===="
     PrintMsg red  "[ "
     printf '%s%30.30s' $color_yellow "$Name"
-    #printf '%s%-33.33s' $color_yellow "$Name"
-    #PrintMsg yellow "$Name"
     PrintMsg red " ]"
     PrintMsg normal "===\n"
     PrintMsg normal "\n"
-
-#    if [ $2 = "ended" ] 2>/dev/null
-#    then
-#        PrintMsg normal "\n"
-#        for LineCount in `seq 1 1 $LineLenth`
-#        do
-#            PrintMsg $LineColor "$LineChars"
-#        done
-#    fi
-
 }
+
 function Stage__Pre-Checks {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
@@ -256,7 +284,7 @@ function Stage__Pre-Checks {
             # if [ `find $Dir  -maxdepth 2 -type f 2>/dev/null | wc -l` -gt 0 ] 2>/dev/null
     	    then
                 let Issue=$Issue+1
-                PrintMsg yellow "warning"
+                PrintMsg yellow "warn"
                 PrintMsg normal "\t$Short not empty."
             else
                 PrintMsg $ColorGood "OK"
@@ -489,7 +517,7 @@ function Stage__CopyIso {
     SubTitle="rem kde to slimming iso"
     let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
         {
-            Removed=`find $WorkRHEL/Packages/. -type f -iname "*kde*.rpm" -exec rm -vf '{}' \; | wc -l`
+            Removed=`find $WorkRHEL/Packages/. -type f -iname "kde-*" -exec rm -vf '{}' \; | wc -l`
             ExCdRemoveKde=$?
 
         }&>/tmp/.rm.find.$$.log
@@ -498,7 +526,7 @@ function Stage__CopyIso {
     then
         PrintMsg $ColorGood "OK"
     else
-        PrintMsg $ColorFail "warning"# ; let Issue=$Issue+1
+        PrintMsg $ColorFail "warn"# ; let Issue=$Issue+1
         PrintMsg normal "\tNo kde files to clean"
     fi
 
@@ -539,7 +567,7 @@ function Stage__CopyACR {
         then
             PrintMsg $ColorGood "OK"
         else
-            PrintMsg yellow "warning"
+            PrintMsg yellow "warn"
             PrintMsg normal "\tWill have to copy a new set"
             NeedaNewCopy="y"
         fi
@@ -550,7 +578,7 @@ function Stage__CopyACR {
         then
             PrintMsg $ColorGood "OK"
         else
-            PrintMsg yellow "warning"
+            PrintMsg yellow "warn"
             PrintMsg normal "\tWill have to copy a new set"
             NeedaNewCopy="y"
         fi
@@ -561,7 +589,7 @@ function Stage__CopyACR {
         then
             PrintMsg $ColorGood "OK"
         else
-            PrintMsg yellow "warning"
+            PrintMsg yellow "warn"
             PrintMsg normal "\tWill have to copy a new set"
             NeedaNewCopy="y"
         fi
@@ -572,7 +600,7 @@ function Stage__CopyACR {
         then
             PrintMsg $ColorGood "OK"
         else
-            PrintMsg yellow "warning"
+            PrintMsg yellow "warn"
             PrintMsg normal "\tWill have to copy a new set"
             NeedaNewCopy="y"
         fi
