@@ -73,5 +73,5 @@ label rescue
 menu separator # insert an empty line
 menu separator # insert an empty line
 
-menu begin Kicksart ACR
+menu begin ACR Install Kickstart 
 

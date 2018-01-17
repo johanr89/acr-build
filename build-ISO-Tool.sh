@@ -941,7 +941,7 @@ function Stage__ISOLUNUX {
     done
 
 
-    SubTitle="Create ISO/"${IsoKSPath} 
+    SubTitle="Dirctory ISO/"${IsoKSPath} 
     let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
     [ -d ${WorkRHEL}/${IsoKSPath} ] || mkdir -p ${WorkRHEL}/${IsoKSPath} 
     if [ -d ${WorkRHEL}/${IsoKSPath} ]
@@ -952,7 +952,6 @@ function Stage__ISOLUNUX {
         PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
 	    return 82
     fi
-
 
     Date=`date +%F`
     Text="acr-build"
@@ -979,7 +978,9 @@ function Stage__ISOLUNUX {
         TemplateTMPISOCombo=/tmp/".isolinux_Combo_"`date +%F`"_"$$".tmp"
 
         cd $WorkAcrKickstart/
+        KickstartNumber=`ls -1 ks__*.cfg | wc -l`
 
+       # ___MenuNum___
         for AcrKsFile in `ls -1 ks__*.cfg`
         do   
             SubTitle="kickstart "$AcrKsFile
@@ -1028,6 +1029,7 @@ function Stage__ISOLUNUX {
 
     if [ -f $WorkRHEL/isolinux/isolinux.cfg ]
     then
+
         ErrCnt="0"
         TemplateTMPISODefault=/tmp/".isolinux_"`date +%F`"_"$$".tmp" || exit 992
 
@@ -1105,6 +1107,13 @@ function Stage__ISOLUNUX {
         PrintMsg $ColorGood "OK"
     fi
 
+    if [ $KickstartNumber -gt 5 ]
+    then
+        PrintMsg yellow "\n\n\tStopping because there are more than five hosts.\n\n\tManually adjust now ..."
+        PrintMsg normal "\n\n"
+        read
+    fi
+
     PrintHead $StgNum "ended" $StgTitle
     Check_Issue_Mode $Issue $StgNum
 
@@ -1117,7 +1126,7 @@ function Stage__ACRPatches {
     PrintHead $StgNum "start" $StgTitle
     PatchDirInWitness="patches"
 
-    SubTitle="Collect acr-patched"
+    SubTitle="Collect acr-patches"
     let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
     [ -d $WorkAcrSw/$PatchDirInWitness ] || mkdir -p $WorkAcrSw/$PatchDirInWitness 
     [ -d $WorkAcrSw/$PatchDirInWitness ] && cp -r $WorkAcrPatch/* $WorkAcrSw/$PatchDirInWitness/.
@@ -1414,14 +1423,33 @@ function Question {
 
     while [ $ValidResponse -gt 0 ]
     do
+      clear
+cat << 'EOF'
 
-	PrintMsg green  "\n\tMENU\n"
-	PrintMsg red    "\t\t$0\n"
-	PrintMsg normal "\n\tLast Stage "
-	PrintMsg red    ">> "
-	PrintMsg yellow "$LAST"
-	PrintMsg red    " << "
-	PrintMsg yellow " \"$LastName\" \n"
+                            _         _ _    _
+        __ _ __ _ _   ___  | |__ _  _(_) |__| |
+       / _` / _| '_| |___| | '_ \ || | | / _` |
+       \__,_\__|_|         |_.__/\_,_|_|_\__,_|
+     
+
+ ==============[ Stage Information ]=====================
+
+ 01 - Check Dependancies   | 02 - Everything mount-related
+ 03 - Sync RHEL iso        | 04 - Sync ACR  iso
+ 05 - kickstart file build | 06 - isolinux boot menu build
+ 07 - ACR Patches          | 08 - Pack acr-tools github
+ 09 - Combine target build | 10 - Generate ISO
+
+ =========================================================
+
+EOF
+	#PrintMsg green  "\n\tMENU\n"
+	#PrintMsg red    "\t\t$0\n"
+	#PrintMsg normal "\n\tLast Stage "
+	#PrintMsg red    ">> "
+	#PrintMsg yellow "$LAST"
+	#PrintMsg red    " << "
+	#PrintMsg yellow " \"$LastName\" \n"
     PrintMsg normal "\n\t["
 	PrintMsg yellow " R "
 	PrintMsg normal "] run (default)"
@@ -1434,15 +1462,15 @@ function Question {
 	PrintMsg green  " C " 
 	PrintMsg normal "] clean working dir"
 
-	PrintMsg normal "\n\t["
-	PrintMsg green  " S "
-	PrintMsg normal "] specify stage"
+#	PrintMsg normal "\n\t["
+#	PrintMsg green  " S "
+#	PrintMsg normal "] specify stage"
 
-	PrintMsg normal "\n\t["
-	PrintMsg green  " N "
-	PrintMsg normal "] next stage ("
-	PrintMsg green "$NextStage"
-	PrintMsg normal ")"
+#	PrintMsg normal "\n\t["
+#	PrintMsg green  " N "
+#	PrintMsg normal "] next stage ("
+#	PrintMsg green "$NextStage"
+#	PrintMsg normal ")"
 
 	PrintMsg yellow "\n\n\t? "
 	unset $Option

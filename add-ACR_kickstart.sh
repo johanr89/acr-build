@@ -83,6 +83,17 @@ esac
 ##
 ##########################################################
 clear
+
+cat << 'EOF'
+
+                       _         _ _    _
+   __ _ __ _ _   ___  | |__ _  _(_) |__| |
+  / _` / _| '_| |___| | '_ \ || | | / _` |
+  \__,_\__|_|         |_.__/\_,_|_|_\__,_|
+
+
+EOF
+
 PrintMsg yellow "\n\nACR KICKSTART INFO COLLECTOR\t[" ; PrintMsg normal " $0 " ; PrintMsg yellow "] \n"
     PrintMsg normal "\n *  Collect a single ACR host's Kickstart configuration.\n"
     PrintMsg normal "\n *  Serves as the primary input for the build-ISO-Tool.sh\n"
