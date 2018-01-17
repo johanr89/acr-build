@@ -97,34 +97,41 @@ function PrintHead {
     LineColor="normal" ; LineChars="=" ; LineLenth="70"
 
     Stge=$1
+    StartOrMode=$2
     Name=`GetLastKnownName $Stge`
 
-    if [ $2 = "start" ] 2>/dev/null
+    if [ $StartOrMode = "start" ] 2>/dev/null
     then
+        Char1=">"
+        Char2="<"
         PrintMsg normal "\n"
         for LineCount in `seq 1 1 $LineLenth`
         do
             PrintMsg normal "$LineChars"
         done
+    else
+        Char1="["
+        Char2="]"
+        StartOrMode=$Confirm_Wait_Auto
     fi
 
     PrintMsg normal "\n"
     PrintMsg normal "\n"
-    PrintMsg blue   "=="
-    PrintMsg red    "> "
-    PrintMsg normal  "$2"
-    PrintMsg red " <"
-    PrintMsg blue   ="====="
+    PrintMsg normal   "=="
+    PrintMsg red    "$Char1 "
+    PrintMsg normal  "$StartOrMode"
+    PrintMsg red " $Char2"
+    PrintMsg normal   ="====="
     PrintMsg red "[ "
-    PrintMsg normal    "stage $1"
+    PrintMsg yellow    "stage $Stge"
     PrintMsg red " ]"
-    PrintMsg blue "===="
+    PrintMsg normal "===="
     PrintMsg red  "[ "
-    printf '%s%30.30s' $color_normal "$Name"
+    printf '%s%30.30s' $color_yellow "$Name"
     #printf '%s%-33.33s' $color_yellow "$Name"
     #PrintMsg yellow "$Name"
     PrintMsg red " ]"
-    PrintMsg blue "===\n"
+    PrintMsg normal "===\n"
     PrintMsg normal "\n"
 
 #    if [ $2 = "ended" ] 2>/dev/null
@@ -305,8 +312,7 @@ function Check_Issue_Mode {
             PrintMsg blue   " Continue ? "
             read; PrintMsg normal "\n"
     else
-            PrintMsg normal "[ Mode : " ; PrintMsg blue   "AUTO" ; PrintMsg normal " ]" ; PrintMsg normal "\t" ;PrintMsg blue " result good - auto  Go-Go-Go  "
-            sleep 1; PrintMsg normal "\n"
+            sleep 1
     fi
 
     echo $StgNum > $StageTrackPrefix
@@ -870,49 +876,76 @@ function Stage__Kickstarts {
 
 function Stage__ISOLUNUX {
 
-    StgNum=$1
-    StgTitle="Boot menu isolinux"
+    StgNum=$1 ; Issue="0" ; Stepper=0
+    StgTitle="Boot menu isolinux" && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" $StgTitle
 
-    PrintMsg normal "\nCheck isolinux template\t"
+###
+#    if [ $? -eq 0 ]
+#    then
+#        PrintMsg $ColorGood "OK"
+#    else
+#        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+#    fi
+####
+#    PrintHead $StgNum "ended" $StgTitle
+#    Check_Issue_Mode $Issue $StgNum
+###
 
-      TemplateISODefault=$MyDir"/template/isolinux-default.template"
-      TemplateISOSingle=$MyDir"/template/isolinux-single.template"
-      TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
 
+    TemplateISODefault=$MyDir"/template/isolinux-default.template"
+    TemplateISOSingle=$MyDir"/template/isolinux-single.template"
+    TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
+
+    for File in $TemplateISODefault $TemplateISOSingle $TemplateISOtoFinal
+    do
+        Short=`echo $File | sed -e 's/\//\n/g' | tail -1` 2>/dev/null
+        SubTitle="Template "$Short
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+
+        if [ -f $File ]
+        then
+            PrintMsg $ColorGood "OK"
+        else
+            PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+            return 81
+        fi
+
+    done
+
+
+    SubTitle="Create ISO/"${IsoKSPath} 
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
     PrintMsg normal "\nCheck iso ks-path\t"
     [ -d ${WorkRHEL}/${IsoKSPath} ] || mkdir -p ${WorkRHEL}/${IsoKSPath} 
     if [ -d ${WorkRHEL}/${IsoKSPath} ]
     then
 	    IsoKsDest=$WorkRHEL/$IsoKSPath
-        PrintMsg blue "OK"
+        PrintMsg $ColorGood "OK"
     else
-        PrintMsg red "FAIL"
-        PrintMsg normal "\tNot found: ${WorkRHEL}/${IsoKSPath}"
-	    return $STG
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+	    return 82
     fi
 
-    PrintMsg normal "\nCheck menu templates\t"
-    if [ -f $TemplateISODefault ] && [ -f $TemplateISOaSingle ] && [ -f $TemplateISOtoFinal ]
+
+    Date=`date +%F`
+    Text="acr-build"
+
+    SubTitle="get var Title"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+    IsoHostTitle=`echo $HostCust | sed -e 's/\ /_/g' | sed -e 's/\./_/g'`
+    if [ `echo $IsoHostTitle | wc -c` -gt 2  ]
     then
-        PrintMsg blue "OK"
+        PrintMsg $ColorGood "OK"
     else
-        PrintMsg red "FAIL"
-        PrintMsg normal "\tNot all are available."
-	    return 5
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+	    return 82
     fi
 
-    PrintMsg normal "\nCollect variales\t"
+    IsoHdLabel=$IsoLabel                       # isolinux-default.template  ___HdLabel___           # IsoLabel
 
-      Date=`date +%F`
-      Text="acr-build"
-      IsoHostTitle=`echo $HostCust | sed -e 's/\ /_/g' | sed -e 's/\./_/g'`
+    IsoSubMenu="ACR_Kickstart"
 
-      IsoHdLabel=$IsoLabel                       # isolinux-default.template  ___HdLabel___           # IsoLabel
-
-      IsoSubMenu="ACR_Kickstart"
-
-    PrintMsg normal "\nPer kickstart\t"
 
     if [ `ls -1 $WorkAcrKickstart/ks__*.cfg | wc -l` -ge 1 ]
     then
@@ -923,6 +956,9 @@ function Stage__ISOLUNUX {
 
         for AcrKsFile in `ls -1 ks__*.cfg`
         do   
+            SubTitle="kickstart "$AcrKsFile
+            let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+
     	    TestSingle=0
             #   IsoSingleLable  == { ___SingleLabel___ }  @  [ isolinux-single.template ]
 	        #     #    Explain "sed" :      | change "." to "_"  | double "_" to one | rem leading "_"  | rem trailing "_" | rem leadingi  "ks_"
@@ -950,12 +986,9 @@ function Stage__ISOLUNUX {
 
     	    if [ $TestSingle -eq 0 ]
             then
-	            #cat $TemplateTMPISOSingle >> $TemplateTMPISOCombo # J1
-                PrintMsg blue "OK"
-                PrintMsg normal "\t"
+                PrintMsg $ColorGood "OK"
             else
-                PrintMsg red "FAIL"
-                PrintMsg normal "\t"
+                PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
         		return 65
             fi
 
@@ -964,36 +997,48 @@ function Stage__ISOLUNUX {
 
     # TemplateISOtoFinal=$MyDir"/template/isolinux-final.template"
 
-        PrintMsg normal "\nInitiate isolinux\t"
+    SubTitle="Build isolinux Boot Menu"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
 
-        if [ -f $WorkRHEL/isolinux/isolinux.cfg ]
-        then
-            ErrCnt="0"
-            TemplateTMPISODefault=/tmp/".isolinux_"`date +%F`"_"$$".tmp" || exit 992
+    if [ -f $WorkRHEL/isolinux/isolinux.cfg ]
+    then
+        ErrCnt="0"
+        TemplateTMPISODefault=/tmp/".isolinux_"`date +%F`"_"$$".tmp" || exit 992
 
-            [ -f $TemplateISODefault  ] && cat $TemplateISODefault  >  $TemplateTMPISODefault || exit 94
-            [ -f $TemplateTMPISOCombo ] && cat $TemplateTMPISOCombo >> $TemplateTMPISODefault || exit 95   
-            [ -f $TemplateISOtoFinal  ] && cat $TemplateISOtoFinal  >> $TemplateTMPISODefault || exit 96  
+        [ -f $TemplateISODefault  ] && cat $TemplateISODefault  >  $TemplateTMPISODefault || exit 94
+        [ -f $TemplateTMPISOCombo ] && cat $TemplateTMPISOCombo >> $TemplateTMPISODefault || exit 95   
+        [ -f $TemplateISOtoFinal  ] && cat $TemplateISOtoFinal  >> $TemplateTMPISODefault || exit 96  
             
-	        if [ $? -ne 0 ]
-            then
-                PrintMsg red "FAIL" 
+	    if [ $? -ne 0 ]
+        then
+                PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
                 return 87
-            else
-                PrintMsg blue "OK" 
-            fi
-
         else
-            PrintMsg red "FAIL"
-            return 87
+                PrintMsg $ColorGood "OK"
         fi
 
-    PrintMsg normal "\nMain isolinux bits\n"
+    else
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+        return 87
+    fi
 
-      sed -i 's/___HdLabel___/'$IsoLabel'/g'   $TemplateTMPISODefault
-      sed -i 's/___Title___/'$IsoHostTitle'/g'   $TemplateTMPISODefault
-      sed -i 's/___SubMenu___/'$IsoHostTitle'/g'   $TemplateTMPISODefault
-      sed -i 's/___Date___/'$Date'/g'   $TemplateTMPISODefault
+    SubTitle="Replace variables"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+
+    ReplaceVar=0
+
+    sed -i 's/___HdLabel___/'$IsoLabel'/g'   $TemplateTMPISODefault     || let ReplaceVar=$ReplaceVar+1
+    sed -i 's/___Title___/'$IsoHostTitle'/g'   $TemplateTMPISODefault   || let ReplaceVar=$ReplaceVar+1
+    sed -i 's/___SubMenu___/'$IsoHostTitle'/g'   $TemplateTMPISODefault || let ReplaceVar=$ReplaceVar+1
+    sed -i 's/___Date___/'$Date'/g'   $TemplateTMPISODefault            || let ReplaceVar=$ReplaceVar+1
+
+    if [ $ReplaceVar -ne 0 ]
+    then
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+        return 89
+    else
+        PrintMsg $ColorGood "OK"
+    fi
 
     if [ $Confirm_Wait_Auto = "auto" ]
     then
@@ -1009,6 +1054,10 @@ function Stage__ISOLUNUX {
     fi
     if [ $ConfIso = "y" ] || [ $ConfIso = "Y" ] 2>/dev/null
     then
+    
+        SubTitle="Check and inject isolinux"
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+
         ISO_Issues="0"    
     #    PrintMsg green "\nConfirmed, writing ..." ; PrintMsg normal "\n"
         cp  ${WorkRHEL}/isolinux/isolinux.cfg /tmp/.isolinix.cfg.orig_`date +%F`_$$
@@ -1024,9 +1073,10 @@ function Stage__ISOLUNUX {
     fi
     if [ $ISO_Issues -gt 0 ]
     then
-             PrintMsg $ColorFail "FAIL"; let Issue=$Issue+1
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+        return 90
     else
-            PrintMsg $ColorGood "OK" 
+        PrintMsg $ColorGood "OK"
     fi
 
     PrintHead $StgNum "ended" $StgTitle
@@ -1070,7 +1120,22 @@ function Stage__ACRTools {
 
     SubTitle="download"
     let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
-## sample
+#    StgNum=$1 ; Issue="0" ; Stepper=0
+#    StgTitle=" REPLACE " && echo ":"$StgNum":"$StgTitle >> $StageListFile
+#    PrintHead $StgNum "start" $StgTitle
+#    SubTitle=" REPLACE "
+#    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+###
+#    if [ $? -eq 0 ]
+#    then
+#        PrintMsg $ColorGood "OK"
+#    else
+#        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+#    fi
+####
+#    PrintHead $StgNum "ended" $StgTitle
+#    Check_Issue_Mode $Issue $StgNum
+###
 	wget -O master.$$.zip $AcrTools_Url &>/dev/null
     if [ $? -eq 0 ]
     then
