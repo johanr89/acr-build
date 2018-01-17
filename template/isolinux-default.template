@@ -1,5 +1,3 @@
-## acr-build - isolinux-default.template ## SRT
-#
 default vesamenu.c32
 timeout 600
 
@@ -7,7 +5,7 @@ display boot.msg
 
 menu clear
 menu background splash.png
-menu title ACR-build - ___Title___ - ___Date___ by ATIO
+menu title  ___Title___ acr-build  ___Date___ 
 menu vshift 8
 menu rows 18
 menu margin 8
@@ -60,30 +58,20 @@ menu separator # insert an empty line
 label local
   menu label Local HD boot
   menu default
-  text help
-      Safeguard against this being the default boot option, boot local HD, after timeout.
-  endtext
   localboot 0xffff
 
 label linux
-  menu label Install Red Hat Enterprise Linux 7.3
+  menu label Install Red Hat Enterprise Linux 7u2
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=___HdLabel___
 
 label rescue
-  menu label Rescue a system
-  text help
-	If the system will not boot, this lets you access files
-	and edit config files to try to get it booting again.
-  endtext
+  menu label Live OS boot
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=___HdLabel___ rescue 
 
 menu separator # insert an empty line
 menu separator # insert an empty line
 
-menu begin Install ___Title___ ACR - kickstart
-#
-## acr-build - isolinux-default.template ## EOF
-#
-#  menu indent count 5
+menu begin Kicksart ACR
+

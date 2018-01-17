@@ -80,5 +80,14 @@ tigervnc-server
 /bin/echo "# Block IP packet forwarding" >> /etc/sysctl.conf
 /bin/echo "net.ipv4.ip_forward = 0" >> /etc/sysctl.conf
 /bin/echo "Created 15.1fp2e" > /etc/ksversion
+/bin/echo "ACR_Build"  >> /root/post_acr_ks.txt
+/bin/mkdir -pv /tmp/iso >> /root/post_acr_ks.txt
+/bin/mount -o ro,loop /dev/sr0 /tmp/iso || /sbin/mount -o ro,loop /dev/sr0 /tmp/iso >> /root/post_acr_ks.txt
+/bin/tar -xzf /tmp/iso/acr-software.tgz -C /hone/witness/ >> /root/tar-iso.txt
+/bin/tar -xzf /tmp/iso/acr-tools.tgz    -C /root/ >> /root/post_acr_ks.txt
+/bin/bash /root/acr-tools-master/setup.sh INSTALL >> /root/post_acr_ks.txt
+/bin/umount /tmp/iso >> /root/post_acr_ks.txt
+/bin/chown witness.witness /home/witness/* >> /root/post_acr_ks.txt
+/bin/chown witness.witness /home/witness/*/* >> /root/post_acr_ks.txt
+/bin/echo "ACR-BUILD"  >> /root/post_acr_ks.txt
 %end
-

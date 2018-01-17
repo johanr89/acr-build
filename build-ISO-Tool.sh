@@ -25,7 +25,7 @@ IsoKSPath="kickstart"
 
 ColorStage="blue"
 ColorGood="yellow"
-ColorGood="blue"
+ColorGood="green"
 ColorFail="red"
 
 color_red=$'\033[31;1m'
@@ -94,33 +94,37 @@ function StageProcess_GetLastEnd {
 
 function PrintHead {
 
-    LineColor="normal" ; LineChars="=" ; LineLenth="40"
+    LineColor="normal" ; LineChars="=" ; LineLenth="70"
 
     Stge=$1
     Name=`GetLastKnownName $Stge`
 
-#    if [ $2 = "start" ] 2>/dev/null
-#    then
-#        PrintMsg normal "\n"
-#        for LineCount in `seq 1 1 $LineLenth`
-#        do
-#            PrintMsg $LineColor "$LineChars"
-#        done
-#    fi
+    if [ $2 = "start" ] 2>/dev/null
+    then
+        PrintMsg normal "\n"
+        for LineCount in `seq 1 1 $LineLenth`
+        do
+            PrintMsg normal "$LineChars"
+        done
+    fi
 
     PrintMsg normal "\n"
     PrintMsg normal "\n"
-    PrintMsg normal "\n"
-    PrintMsg normal "====>> "
-    PrintMsg green  "$2"
-    PrintMsg normal " <<===="
+    PrintMsg blue   "=="
+    PrintMsg red    "> "
+    PrintMsg normal  "$2"
+    PrintMsg red " <"
+    PrintMsg blue   ="====="
     PrintMsg red "[ "
-    PrintMsg yellow    "$1"
+    PrintMsg normal    "stage $1"
     PrintMsg red " ]"
-    PrintMsg normal "===============[ "
-    PrintMsg yellow "$Name"
-    PrintMsg normal " ]=======\n"
-    PrintMsg normal "\n"
+    PrintMsg blue "===="
+    PrintMsg red  "[ "
+    printf '%s%30.30s' $color_normal "$Name"
+    #printf '%s%-33.33s' $color_yellow "$Name"
+    #PrintMsg yellow "$Name"
+    PrintMsg red " ]"
+    PrintMsg blue "===\n"
     PrintMsg normal "\n"
 
 #    if [ $2 = "ended" ] 2>/dev/null
@@ -301,7 +305,7 @@ function Check_Issue_Mode {
             PrintMsg blue   " Continue ? "
             read; PrintMsg normal "\n"
     else
-            PrintMsg normal "[ Mode : " ; PrintMsg blue   "AUTO" ; PrintMsg normal " ]" ; PrintMsg normal "\t" ;PrintMsg yellow " result good - auto  Go-Go-Go  "
+            PrintMsg normal "[ Mode : " ; PrintMsg blue   "AUTO" ; PrintMsg normal " ]" ; PrintMsg normal "\t" ;PrintMsg blue " result good - auto  Go-Go-Go  "
             sleep 1; PrintMsg normal "\n"
     fi
 
@@ -477,23 +481,22 @@ function Stage__CopyIso {
 
 ########################## rem kde to slimming iso ########################## 
 
-    SubTitle="rem kde to slimming iso"
-    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
-        {
-            Removed=`find $WorkRHEL/Packages/. -type f -iname "*kde*.rpm" -exec rm -vf '{}' \; | wc -l`
-            ExCdRemoveKde=$?
+#    SubTitle="rem kde to slimming iso"
+#    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+#        {
+#            Removed=`find $WorkRHEL/Packages/. -type f -iname "*kde*.rpm" -exec rm -vf '{}' \; | wc -l`
+#            ExCdRemoveKde=$?
+#
+#        }&>/tmp/.rm.find.$$.log
+#
+#    if [ $Removed -gt 50 ] && [ $ExCdRemoveKde -eq 0 ]
+#    then
+#        PrintMsg $ColorGood "OK"
+#    else
+#        PrintMsg $ColorFail "warning"# ; let Issue=$Issue+1
+#        PrintMsg normal "\tNo kde files to clean"
+#    fi
 
-        }&>/tmp/.rm.find.$$.log
-
-    if [ $Removed -gt 50 ] && [ $ExCdRemoveKde -eq 0 ]
-    then
-        PrintMsg $ColorGood "OK"
-    else
-        PrintMsg $ColorFail "warning"# ; let Issue=$Issue+1
-        PrintMsg normal "\tNo kde files to clean"
-    fi
-
-    # PrintMsg normal "\n\n==[ " && PrintMsg blue "Stage" &&  PrintMsg yellow "$StgNum" && PrintMsg normal " ]=========[\t" && PrintMsg red "\t$StgTitle" && PrintMsg normal "\t]==\n\n"
 
     PrintHead $StgNum "ended" $StgTitle
     Check_Issue_Mode $Issue $StgNum
@@ -868,8 +871,8 @@ function Stage__Kickstarts {
 function Stage__ISOLUNUX {
 
     StgNum=$1
-
-    PrintHead $StgNum "start" 
+    StgTitle="Boot menu isolinux"
+    PrintHead $StgNum "start" $StgTitle
 
     PrintMsg normal "\nCheck isolinux template\t"
 
@@ -992,24 +995,22 @@ function Stage__ISOLUNUX {
       sed -i 's/___SubMenu___/'$IsoHostTitle'/g'   $TemplateTMPISODefault
       sed -i 's/___Date___/'$Date'/g'   $TemplateTMPISODefault
 
-    PrintMsg normal "\n"
-    PrintMsg blue "==========================================================================" ; PrintMsg normal "\n"
-    cat $TemplateTMPISODefault 
-    PrintMsg blue "==========================================================================" ; PrintMsg normal "\n"
-    if [ `grep "___"  $TemplateTMPISODefault | wc -l` -gt 0 ]
+    if [ $Confirm_Wait_Auto = "auto" ]
     then
-	    PrintMsg red "\nISSUES" ; PrintMsg normal "\n"
-            grep "___"  $TemplateTMPISODefault
-	    PrintMsg red "\nexit now." ; PrintMsg normal "\n"
-	    exit 1
+        ConfIso="y"
+    else
+        PrintMsg normal "\n"
+        PrintMsg blue "==========================================================================" ; PrintMsg normal "\n"
+        cat $TemplateTMPISODefault 
+        PrintMsg blue "==========================================================================" ; PrintMsg normal "\n"
+        PrintMsg $ColorStage "\nAccept ? [y/n] "
+        read ConfIso
+        PrintMsg normal "\n"
     fi
-    PrintMsg $ColorStage "\nAccept ? [y/n] "
-    read ConfIso
-    PrintMsg normal "\n"
     if [ $ConfIso = "y" ] || [ $ConfIso = "Y" ] 2>/dev/null
     then
         ISO_Issues="0"    
-        PrintMsg green "\nConfirmed, writing ..." ; PrintMsg normal "\n"
+    #    PrintMsg green "\nConfirmed, writing ..." ; PrintMsg normal "\n"
         cp  ${WorkRHEL}/isolinux/isolinux.cfg /tmp/.isolinix.cfg.orig_`date +%F`_$$
 	    cat $TemplateTMPISODefault > ${WorkRHEL}/isolinux/isolinux.cfg || let ISO_Issues=$ISO_Issues+1
         [ `cat ${WorkRHEL}/isolinux/isolinux.cfg | grep "___" | wc -l` -lt 1 ] || let ISO_Issues=$ISO_Issues+1
@@ -1021,7 +1022,7 @@ function Stage__ISOLUNUX {
         PrintMsg green "\nNot writing to ISO, exit." ; PrintMsg normal "\n"
         exit 0
     fi
-    if [ $ISO_Issuesi -gt 0 ]
+    if [ $ISO_Issues -gt 0 ]
     then
              PrintMsg $ColorFail "FAIL"; let Issue=$Issue+1
     else
@@ -1037,7 +1038,7 @@ function Stage__ACRPatches {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
     StgTitle="ACR Patches" && echo ":"$StgNum":"$StgTitle >> $StageListFile
-    PrintHead $StgNum "start" 
+    PrintHead $StgNum "start" $StgTitle
     PatchDirInWitness="patches"
 
     SubTitle="Collect acr-patched"
@@ -1061,33 +1062,54 @@ function Stage__ACRTools {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
     StgTitle="Bundle acr-tools github" && echo ":"$StgNum":"$StgTitle >> $StageListFile
-    PrintHead $StgNum "start" 
+    PrintHead $StgNum "start" $StgTitle
     
 ### ########################## check root permission ########################## 
-    SubTitle="root permission"
-    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
-    # PrintMsg $ColorGood "OK"
-    # PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
-## sample
-    StgNum=$1
-
-    PrintMsg $ColorStage "\nStage $StgNum start\t" ; PrintMsg normal "acr-tools\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-
-    PrintMsg normal "\nCollect acr-tools ...\n"
-
     CurDir=`pwd -P`
-    cd $WorkAcrTools \
-	    && wget -O master.$$.zip $AcrTools_Url &>/dev/null \
-	    && unzip master.$$.zip &>/dev/null  \
-	    && rm -f  master.$$.zip  &>/dev/null  \
-	    && tar -cvzf $WorkRHEL/acr-tools.tgz acr-tools-master  &>/dev/null \
-	    && cd $WorkRHEL/ \
-	    && sha1sum acr-tools.tgz | tee acr-tools.tgz.`date +%F`.sha1sum.txt 
+    cd $WorkAcrTools 
 
-        PrintMsg normal "\nCollect acr-tools\t"
-	PrintMsg blue "OK" 
-        PrintMsg normal "\t`sha1sum -c acr-tools.tgz.`date +%F`.sha1sum.txt`"
+    SubTitle="download"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+## sample
+	wget -O master.$$.zip $AcrTools_Url &>/dev/null
+    if [ $? -eq 0 ]
+    then
+        PrintMsg $ColorGood "OK"
+    else
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+    fi
+
+    SubTitle="Unzip source"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+	unzip master.$$.zip &>/dev/null  
+    if [ $? -eq 0 ]
+    then
+        PrintMsg $ColorGood "OK"
+	    rm -f  master.$$.zip  &>/dev/null 
+    else
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+    fi
+
+    SubTitle="create archive"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+	tar -cvzf $WorkRHEL/acr-tools.tgz acr-tools-master  &>/dev/null
+    if [ $? -eq 0 ]
+    then
+        PrintMsg $ColorGood "OK"
+    else
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+    fi
+
+    SubTitle="checksum"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+	cd $WorkRHEL/ \
+	    && sha1sum acr-tools.tgz > acr-tools.tgz.`date +%F`.sha1sum.txt 
+    if [ $? -eq 0 ]
+    then
+        PrintMsg $ColorGood "OK"
+    else
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+    fi
 
     cd $CurDir
 
@@ -1098,30 +1120,18 @@ function Stage__ACRTools {
 
 function Stage__Combiner {
 
-### sample y9j
     StgNum=$1 ; Issue="0" ; Stepper=0
-    StgTitle="Combine everyting" && echo ":"$StgNum":"$StgTitle >> $StageListFile
-    PrintHead $StgNum "start" 
+    StgTitle="Combine target build" && echo ":"$StgNum":"$StgTitle >> $StageListFile
+    PrintHead $StgNum "start" $StgTitle
     
     PatchDirInWitness="patches"
     InstallerDirInWitness="install" 
 
-### ########################## check root permission ########################## 
-    SubTitle="root permission"
+    SubTitle="Add software and patches"
     let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
-    # PrintMsg $ColorGood "OK"
-    # PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
-## sample
-    StgNum=$1
 
-    PrintMsg $ColorStage "\nStage $StgNum start\t" ; PrintMsg normal "Combiner\n"
-    echo "S"$StgNum":start "`date +%F\ \ %H-%M-%S` >> $StageTrackFile
-
-    echo $WorkAcrPatch
     CurDir=`pwd -P`
     IsoArchSoftware="acr-software.tgz"
-
-    PrintMsg normal "\nPrepare dir ISO/$IsoDirSoftware\t"
 
    cd $WorkAcrSw
    if [ $? -eq 0 ]
@@ -1139,18 +1149,18 @@ function Stage__Combiner {
 
        	   if [ $? -eq 0 ]
            then
-               PrintMsg blue "OK" 
+               PrintMsg $ColorGood "OK"
            else
-#           /tmp/.tar.comvine.$$.log    PrintMsg red "FAIL"
-	       return 87
+               PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+	           return 87
            fi
        else 
-           PrintMsg red "FAIL"
-	   return 89
+           PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+	       return 89
        fi
    else
-        PrintMsg red "FAIL"
-	return 88
+        PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+    	return 88
    fi
    cd $CurrDir
 
@@ -1163,7 +1173,7 @@ function Stage__GenISOImage {
 
     StgNum=$1 ; Issue="0" ; Stepper=0
     StgTitle="Generate ISO" && echo ":"$StgNum":"$StgTitle >> $StageListFile
-    PrintHead $StgNum "start" 
+    PrintHead $StgNum "start" $StgTitle
     
 ### ########################## check root permission ########################## 
     SubTitle="geniso"
@@ -1191,7 +1201,7 @@ function Stage__GenISOImage {
             
             ExCoGen=$?
 
-        }&>/tmp/.geniso.&&.log
+        }&>/tmp/.geniso.$$.log
 
     if [ $ExCoGen -eq 0 ]
     then
@@ -1213,12 +1223,19 @@ function Stage__Cleanup {
     StgTitle="Cleanup"  && echo ":"$StgNum":"$StgTitle >> $StageListFile
     PrintHead $StgNum "start" $StgTitle
 
-# ########################## ? ########################## 
-# SubTitle="root permission"
-# let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
-# PrintMsg $ColorGood "OK"
-# PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
-# ########################## ? ########################## 
+    for DirToClean in $WorkRHEL $WorkAcrSw $WorkAcrKickstart $WorkAcrTools     # $WorkAcrPatch 
+    do
+        Short=`echo $DirToClean | sed -e 's/\//\n/g' | tail -1` 2>/dev/null
+        SubTitle="Clean "$Short
+        let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+        [ -d $DirToClean ] && rm -rf $DirToClean/* 2>/dev/null
+        if [ $? -eq 0 ]
+        then 
+            PrintMsg $ColorGood "OK"
+        else
+            PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+        fi
+    done
 
     PrintHead $StgNum "ended" $StgTitle
     Check_Issue_Mode $Issue $StgNum
@@ -1462,44 +1479,50 @@ fi
     if [ $STG -eq 06 ]
     then
         ListStageUpdate 6 "isolinux boot menu build"
-	Stage__ISOLUNUX $STG
+	    Stage__ISOLUNUX $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 07 ]
     then
         ListStageUpdate 7 "acr-patches"
-	Stage__ACRPatches $STG
+	    Stage__ACRPatches $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 08 ]
     then
         ListStageUpdate 8 "act-tools"
-	Stage__ACRTools $STG
+	    Stage__ACRTools $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 09 ]
     then
         ListStageUpdate 9 "Merge iso"
-	Stage__Combiner
+	    Stage__Combiner $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 10 ]
     then
         ListStageUpdate 10 "Generate ISO"
-	Stage__GenISOImage $STG
+	    Stage__GenISOImage $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 11 ]
     then
         ListStageUpdate 11 "Post-Cleanup"
-	Stage__Cleanup $STG
+	    Stage__Cleanup $STG
         ErrorStatus $?
     fi
     if [ $STG -eq 12 ]
     then
         ListStageUpdate 12 "End"
-	echo $STS > $StageTrackPrefix
-	echo "ALL Done"
+	    echo $STS > $StageTrackPrefix
+        PrintMsg yellow "\n\nCompleted ISO:"
+        PrintMsg normal "\n\n\t"
+        file $WorkMain/$IsoLabel".iso"
+        PrintMsg normal "\n\t"
+        du -h $WorkMain/$IsoLabel".iso"
+        PrintMsg yellow "\n\n$WorkMain/$IsoLabel.iso"
+        PrintMsg normal "\n"
         exit 0
     fi
 

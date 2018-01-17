@@ -1,13 +1,6 @@
-#
-#      acr-build - isolinux-single.template ## SRT
 
 label ___SingleLabel___
     menu label ___SingleMenuText___
-    text help
-        ___SingleHelpText___
-    endtext
     kernel vmlinuz
     append initrd=initrd.img inst.text inst.ks=hd:LABEL=___HdLabel___:___FullPathToKsCfg___
 
-#      acr-build - isolinux-single.template ## EOF
-#     - - - - - - - - - - - - - - - - - - - - - - - - 
