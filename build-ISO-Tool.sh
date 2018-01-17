@@ -485,23 +485,22 @@ function Stage__CopyIso {
     fi
 
 
-########################## rem kde to slimming iso ########################## 
 
-#    SubTitle="rem kde to slimming iso"
-#    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
-#        {
-#            Removed=`find $WorkRHEL/Packages/. -type f -iname "*kde*.rpm" -exec rm -vf '{}' \; | wc -l`
-#            ExCdRemoveKde=$?
-#
-#        }&>/tmp/.rm.find.$$.log
-#
-#    if [ $Removed -gt 50 ] && [ $ExCdRemoveKde -eq 0 ]
-#    then
-#        PrintMsg $ColorGood "OK"
-#    else
-#        PrintMsg $ColorFail "warning"# ; let Issue=$Issue+1
-#        PrintMsg normal "\tNo kde files to clean"
-#    fi
+    SubTitle="rem kde to slimming iso"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+        {
+            Removed=`find $WorkRHEL/Packages/. -type f -iname "*kde*.rpm" -exec rm -vf '{}' \; | wc -l`
+            ExCdRemoveKde=$?
+
+        }&>/tmp/.rm.find.$$.log
+
+    if [ $Removed -gt 50 ] && [ $ExCdRemoveKde -eq 0 ]
+    then
+        PrintMsg $ColorGood "OK"
+    else
+        PrintMsg $ColorFail "warning"# ; let Issue=$Issue+1
+        PrintMsg normal "\tNo kde files to clean"
+    fi
 
 
     PrintHead $StgNum "ended" $StgTitle
@@ -916,7 +915,6 @@ function Stage__ISOLUNUX {
 
     SubTitle="Create ISO/"${IsoKSPath} 
     let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
-    PrintMsg normal "\nCheck iso ks-path\t"
     [ -d ${WorkRHEL}/${IsoKSPath} ] || mkdir -p ${WorkRHEL}/${IsoKSPath} 
     if [ -d ${WorkRHEL}/${IsoKSPath} ]
     then
@@ -1229,6 +1227,16 @@ function Stage__Combiner {
    fi
    cd $CurrDir
 
+    SubTitle="Copy host config"
+    let Stepper=$Stepper+1 ; printf '%s\n   %-3.3s | ' $color_blue  "$Stepper" ; printf '%s %-35.35s | '  $color_normal "$SubTitle"
+    cp $MyDir/Host_Config* $WorkRHEL/$IsoKSPath/.
+    if [ $? -eq 0 ]
+    then
+               PrintMsg $ColorGood "OK"
+    else
+               PrintMsg $ColorFail "FAIL" ; let Issue=$Issue+1
+    fi
+    
     PrintHead $StgNum "ended" $StgTitle
     Check_Issue_Mode $Issue $StgNum
 
